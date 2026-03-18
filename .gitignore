@@ -44,6 +44,9 @@ backend/__pycache__/
 backend/.pytest_cache/
 backend/.mypy_cache/
 backend/storage/
+backend/*.db
+backend/*.wav
+backend/*.log
 *.sqlite3
 
 # Symbolication related

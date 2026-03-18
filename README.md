@@ -41,9 +41,8 @@ Local backend run:
 
 ```bash
 cd backend
-pip install -r requirements.txt
-copy .env.example .env
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
 ```
 
 Notes:

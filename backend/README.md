@@ -10,6 +10,15 @@ Minimal FastAPI prototype for the core voice-note loop:
 
 ## Local run
 
+Fastest path on PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
+```
+
+Manual path:
+
 1. Create a virtual environment.
 2. Install dependencies:
 
@@ -18,10 +27,20 @@ pip install -r requirements.txt
 ```
 
 3. Copy `.env.example` to `.env` and fill in `DATABASE_URL`. Add `LLM_API_KEY` and `LLM_MODEL` if you want live note generation instead of the heuristic fallback.
+   Local-first default:
+   - keep `DATABASE_URL=sqlite:///./capybara_coach.db`
+   Railway deploy:
+   - replace it with Railway Postgres `DATABASE_URL`
 4. Start the API:
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Smoke test after the server starts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1
 ```
 
 ## Railway
