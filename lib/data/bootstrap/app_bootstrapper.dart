@@ -8,6 +8,9 @@ import '../firebase/firebase_auth_service.dart';
 import '../firebase/firebase_audio_storage_service.dart';
 import '../firebase/firebase_initializer.dart';
 import '../firebase/firebase_notes_repository.dart';
+import '../fastapi/capybara_coach_api_client.dart';
+import '../fastapi/fastapi_notes_repository.dart';
+import '../fastapi/fastapi_voice_note_pipeline_service.dart';
 import '../local/recording_device_service.dart';
 import '../mock/mock_audio_storage_service.dart';
 import '../mock/mock_auth_service.dart';
@@ -20,6 +23,7 @@ import '../mock/mock_recall_evaluation_service.dart';
 import '../mock/mock_session_note_synthesis_service.dart';
 import '../mock/mock_study_note_generation_service.dart';
 import '../mock/mock_transcription_service.dart';
+import '../mock/mock_voice_note_pipeline_service.dart';
 
 class AppBootstrapper {
   const AppBootstrapper();
@@ -42,10 +46,43 @@ class AppBootstrapper {
 
     final currentUser = await authService.initializeSession();
 
-    final notesRepository = firebaseRuntime.enabled
+    final useFastApiPipeline = environment.useFastApiPipeline;
+    final apiClient = useFastApiPipeline
+        ? CapybaraCoachApiClient(baseUrl: environment.apiBaseUrl)
+        : null;
+
+    final notesRepository = useFastApiPipeline
+        ? FastApiNotesRepository(
+            currentUser: currentUser,
+            apiClient: apiClient!,
+            pollInterval: Duration(seconds: environment.apiPollIntervalSeconds),
+          )
+        : firebaseRuntime.enabled
         ? FirebaseNotesRepository()
         : MockNotesRepository.seeded(currentUser);
     final learningRepository = MockLearningRepository.seeded(currentUser);
+    final mockAudioStorageService = const MockAudioStorageService();
+    final mockTranscriptionService = const MockTranscriptionService();
+    final mockStudyNoteGenerationService = const MockStudyNoteGenerationService();
+    final mockKnowledgeOrganizationService =
+        const MockKnowledgeOrganizationService();
+    final mockRelatedNotesService = const MockRelatedNotesService();
+
+    final voiceNotePipelineService = useFastApiPipeline
+        ? FastApiVoiceNotePipelineService(
+            apiClient: apiClient!,
+            notesRepository: notesRepository,
+            pollInterval: Duration(seconds: environment.apiPollIntervalSeconds),
+            readyTimeout: Duration(seconds: environment.apiReadyTimeoutSeconds),
+          )
+        : MockVoiceNotePipelineService(
+            notesRepository: notesRepository,
+            audioStorageService: mockAudioStorageService,
+            transcriptionService: mockTranscriptionService,
+            studyNoteGenerationService: mockStudyNoteGenerationService,
+            knowledgeOrganizationService: mockKnowledgeOrganizationService,
+            relatedNotesService: mockRelatedNotesService,
+          );
 
     return AppDependencies(
       environment: environment,
@@ -57,14 +94,15 @@ class AppBootstrapper {
       recordingDeviceService: createRecordingDeviceService(),
       audioStorageService: firebaseRuntime.enabled
           ? FirebaseAudioStorageService(storage: FirebaseStorage.instance)
-          : const MockAudioStorageService(),
-      transcriptionService: const MockTranscriptionService(),
+          : mockAudioStorageService,
+      transcriptionService: mockTranscriptionService,
       documentParsingService: const MockDocumentParsingService(),
       recallEvaluationService: const MockRecallEvaluationService(),
       sessionNoteSynthesisService: const MockSessionNoteSynthesisService(),
-      studyNoteGenerationService: const MockStudyNoteGenerationService(),
-      knowledgeOrganizationService: const MockKnowledgeOrganizationService(),
-      relatedNotesService: const MockRelatedNotesService(),
+      studyNoteGenerationService: mockStudyNoteGenerationService,
+      knowledgeOrganizationService: mockKnowledgeOrganizationService,
+      relatedNotesService: mockRelatedNotesService,
+      voiceNotePipelineService: voiceNotePipelineService,
     );
   }
 }

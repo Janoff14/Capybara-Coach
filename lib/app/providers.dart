@@ -21,6 +21,7 @@ import '../domain/services/auth_service.dart';
 import '../domain/services/learning_repository.dart';
 import '../domain/services/notes_repository.dart';
 import '../domain/services/pipeline_services.dart';
+import '../domain/services/voice_note_pipeline_service.dart';
 import 'app_dependencies.dart';
 import 'router.dart';
 
@@ -90,6 +91,10 @@ final relatedNotesServiceProvider = Provider<RelatedNotesService>(
   (ref) => ref.watch(appDependenciesProvider).relatedNotesService,
 );
 
+final voiceNotePipelineServiceProvider = Provider<VoiceNotePipelineService>(
+  (ref) => ref.watch(appDependenciesProvider).voiceNotePipelineService,
+);
+
 final assistantControllerProvider =
     StateNotifierProvider<AssistantController, AssistantMood>((ref) {
       return AssistantController();
@@ -99,17 +104,8 @@ final recordingControllerProvider =
     StateNotifierProvider<RecordingController, RecordingState>((ref) {
       return RecordingController(
         currentUser: ref.watch(currentUserProvider),
-        notesRepository: ref.watch(notesRepositoryProvider),
         recordingDeviceService: ref.watch(recordingDeviceServiceProvider),
-        audioStorageService: ref.watch(audioStorageServiceProvider),
-        transcriptionService: ref.watch(transcriptionServiceProvider),
-        studyNoteGenerationService: ref.watch(
-          studyNoteGenerationServiceProvider,
-        ),
-        knowledgeOrganizationService: ref.watch(
-          knowledgeOrganizationServiceProvider,
-        ),
-        relatedNotesService: ref.watch(relatedNotesServiceProvider),
+        voiceNotePipelineService: ref.watch(voiceNotePipelineServiceProvider),
         assistantController: ref.read(assistantControllerProvider.notifier),
       );
     });

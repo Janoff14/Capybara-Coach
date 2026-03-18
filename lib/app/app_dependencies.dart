@@ -5,6 +5,7 @@ import '../domain/services/auth_service.dart';
 import '../domain/services/learning_repository.dart';
 import '../domain/services/notes_repository.dart';
 import '../domain/services/pipeline_services.dart';
+import '../domain/services/voice_note_pipeline_service.dart';
 
 class AppDependencies {
   const AppDependencies({
@@ -23,6 +24,7 @@ class AppDependencies {
     required this.studyNoteGenerationService,
     required this.knowledgeOrganizationService,
     required this.relatedNotesService,
+    required this.voiceNotePipelineService,
   });
 
   final AppEnvironment environment;
@@ -40,4 +42,5 @@ class AppDependencies {
   final StudyNoteGenerationService studyNoteGenerationService;
   final KnowledgeOrganizationService knowledgeOrganizationService;
   final RelatedNotesService relatedNotesService;
+  final VoiceNotePipelineService voiceNotePipelineService;
 }

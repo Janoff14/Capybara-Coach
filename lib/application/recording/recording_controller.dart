@@ -1,41 +1,27 @@
 import 'dart:async';
 
-import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../domain/models/app_user.dart';
 import '../../domain/models/assistant_mood.dart';
-import '../../domain/models/folder_entity.dart';
-import '../../domain/models/note_generation.dart';
-import '../../domain/models/note_link_entity.dart';
 import '../../domain/models/note_processing.dart';
 import '../../domain/models/recording_phase.dart';
 import '../../domain/models/study_note.dart';
-import '../../domain/services/notes_repository.dart';
 import '../../domain/services/pipeline_services.dart';
+import '../../domain/services/voice_note_pipeline_service.dart';
 import '../assistant/assistant_controller.dart';
 import 'recording_state.dart';
 
 class RecordingController extends StateNotifier<RecordingState> {
   RecordingController({
     required AppUser currentUser,
-    required NotesRepository notesRepository,
     required RecordingDeviceService recordingDeviceService,
-    required AudioStorageService audioStorageService,
-    required TranscriptionService transcriptionService,
-    required StudyNoteGenerationService studyNoteGenerationService,
-    required KnowledgeOrganizationService knowledgeOrganizationService,
-    required RelatedNotesService relatedNotesService,
+    required VoiceNotePipelineService voiceNotePipelineService,
     required AssistantController assistantController,
   })  : _currentUser = currentUser,
-        _notesRepository = notesRepository,
         _recordingDeviceService = recordingDeviceService,
-        _audioStorageService = audioStorageService,
-        _transcriptionService = transcriptionService,
-        _studyNoteGenerationService = studyNoteGenerationService,
-        _knowledgeOrganizationService = knowledgeOrganizationService,
-        _relatedNotesService = relatedNotesService,
+        _voiceNotePipelineService = voiceNotePipelineService,
         _assistantController = assistantController,
         super(RecordingState.initial(
           recorderSupported: recordingDeviceService.isSupported,
@@ -43,13 +29,8 @@ class RecordingController extends StateNotifier<RecordingState> {
 
   final _uuid = const Uuid();
   final AppUser _currentUser;
-  final NotesRepository _notesRepository;
   final RecordingDeviceService _recordingDeviceService;
-  final AudioStorageService _audioStorageService;
-  final TranscriptionService _transcriptionService;
-  final StudyNoteGenerationService _studyNoteGenerationService;
-  final KnowledgeOrganizationService _knowledgeOrganizationService;
-  final RelatedNotesService _relatedNotesService;
+  final VoiceNotePipelineService _voiceNotePipelineService;
   final AssistantController _assistantController;
 
   Timer? _ticker;
@@ -176,213 +157,24 @@ class RecordingController extends StateNotifier<RecordingState> {
       return;
     }
 
-    final noteId = _uuid.v4();
-    final now = DateTime.now();
-    final jobBaseId = _uuid.v4();
-
     try {
       _assistantController.setMood(AssistantMood.thinking);
       state = state.copyWith(
         phase: RecordingPhase.uploading,
-        statusMessage: 'Uploading audio for transcription...',
-        processingNoteId: noteId,
+        statusMessage: 'Uploading audio to the backend...',
         clearErrorMessage: true,
       );
 
-      final storedAudio = await _audioStorageService.upload(
+      final finalNote = await _voiceNotePipelineService.processRecording(
         user: _currentUser,
         recording: pendingAudio,
-      );
-
-      var placeholderNote = StudyNote(
-        id: noteId,
-        userId: _currentUser.id,
-        folderId: null,
-        sourceAudioUrl: storedAudio.downloadUrl,
-        rawTranscript: '',
-        cleanedTitle: 'Processing your latest voice note',
-        cleanedSummary: 'DictaCoach is shaping your recording into a study note.',
-        cleanedContent:
-            'The transcript and note structure will appear here when processing finishes.',
-        keyIdeas: const <String>[],
-        reviewQuestions: const <String>[],
-        keyTerms: const <String>[],
-        tags: const <String>[],
-        topics: const <String>[],
-        relatedNoteIds: const <String>[],
-        aiProcessingStatus: NoteProcessingStatus.uploading,
-        createdAt: now,
-        updatedAt: now,
-        sourceDuration: pendingAudio.duration,
-      );
-
-      await _notesRepository.upsertNote(placeholderNote);
-      await _notesRepository.upsertProcessingJob(
-        ProcessingJob(
-          id: '$jobBaseId-upload',
-          userId: _currentUser.id,
-          noteId: noteId,
-          jobType: ProcessingJobType.transcription,
-          status: ProcessingJobStatus.running,
-          provider: _audioStorageService.providerKey,
-          errorMessage: null,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-
-      state = state.copyWith(
-        phase: RecordingPhase.transcribing,
-        statusMessage: 'Transcribing the recording...',
-      );
-
-      final transcript = await _transcriptionService.transcribe(
-        user: _currentUser,
-        audio: storedAudio,
-        duration: pendingAudio.duration,
-      );
-
-      placeholderNote = placeholderNote.copyWith(
-        rawTranscript: transcript.text,
-        aiProcessingStatus: NoteProcessingStatus.transcribing,
-        updatedAt: DateTime.now(),
-      );
-      await _notesRepository.upsertNote(placeholderNote);
-
-      state = state.copyWith(
-        phase: RecordingPhase.generating,
-        statusMessage: 'Turning the raw transcript into a clean study note...',
-      );
-
-      final generatedNote = await _studyNoteGenerationService.generate(
-        context: NoteGenerationContext(
-          user: _currentUser,
-          transcript: transcript,
-        ),
-      );
-
-      final folders = await _notesRepository.listFolders(_currentUser.id);
-      final notes = await _notesRepository.listNotes(_currentUser.id);
-
-      state = state.copyWith(
-        phase: RecordingPhase.organizing,
-        statusMessage: 'Assigning folders, tags, and related note links...',
-      );
-
-      final organizationPlan = await _knowledgeOrganizationService.organize(
-        context: KnowledgeOrganizationContext(
-          user: _currentUser,
-          generatedNote: generatedNote,
-          existingFolders: folders,
-          existingNotes: notes,
-        ),
-      );
-
-      FolderEntity? targetFolder = folders.firstWhereOrNull(
-        (folder) =>
-            folder.title.toLowerCase() ==
-            organizationPlan.folderTitle.toLowerCase(),
-      );
-
-      if (targetFolder == null && organizationPlan.createNewFolder) {
-        targetFolder = FolderEntity(
-          id: _uuid.v4(),
-          userId: _currentUser.id,
-          title: organizationPlan.folderTitle,
-          description: organizationPlan.folderDescription,
-          parentFolderId: null,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          aiGenerated: true,
-        );
-        await _notesRepository.upsertFolder(targetFolder);
-      }
-
-      final mergedTags = {
-        ...generatedNote.tags,
-        ...organizationPlan.tags,
-      }.toList()
-        ..sort();
-      final mergedTopics = {
-        ...generatedNote.topics,
-        ...organizationPlan.topics,
-      }.toList()
-        ..sort();
-
-      var finalNote = placeholderNote.copyWith(
-        folderId: targetFolder?.id ?? folders.firstOrNull?.id,
-        cleanedTitle: generatedNote.title,
-        cleanedSummary: generatedNote.summary,
-        cleanedContent: generatedNote.cleanedContent,
-        keyIdeas: generatedNote.keyIdeas,
-        reviewQuestions: generatedNote.reviewQuestions,
-        keyTerms: generatedNote.importantTerms,
-        tags: mergedTags,
-        topics: mergedTopics,
-        aiProcessingStatus: NoteProcessingStatus.generating,
-        updatedAt: DateTime.now(),
-      );
-
-      final relatedMatches = await _relatedNotesService.findRelated(
-        context: RelatedNotesContext(
-          currentNote: finalNote,
-          existingNotes: notes.where((note) => note.id != finalNote.id).toList(),
-        ),
-      );
-
-      finalNote = finalNote.copyWith(
-        relatedNoteIds: relatedMatches.map((match) => match.noteId).toList(),
-        aiProcessingStatus: NoteProcessingStatus.ready,
-        updatedAt: DateTime.now(),
-      );
-
-      await _notesRepository.upsertNote(finalNote);
-
-      final links = relatedMatches
-          .map(
-            (match) => NoteLinkEntity(
-              id: _uuid.v4(),
-              userId: _currentUser.id,
-              fromNoteId: finalNote.id,
-              toNoteId: match.noteId,
-              relationType: match.relationType,
-              score: match.score,
-              createdAt: DateTime.now(),
-            ),
-          )
-          .toList();
-      await _notesRepository.replaceLinksForNote(
-        _currentUser.id,
-        finalNote.id,
-        links,
-      );
-
-      await _backfillRelatedNoteIds(finalNote, relatedMatches, notes);
-
-      final completedAt = DateTime.now();
-      await _notesRepository.upsertProcessingJob(
-        ProcessingJob(
-          id: '$jobBaseId-generate',
-          userId: _currentUser.id,
-          noteId: noteId,
-          jobType: ProcessingJobType.noteGeneration,
-          status: ProcessingJobStatus.complete,
-          provider: [
-            _transcriptionService.providerKey,
-            _studyNoteGenerationService.providerKey,
-            _knowledgeOrganizationService.providerKey,
-            _relatedNotesService.providerKey,
-          ].join(' -> '),
-          errorMessage: null,
-          createdAt: now,
-          updatedAt: completedAt,
-        ),
+        onProgress: _handleProgressUpdate,
       );
 
       state = state.copyWith(
         phase: RecordingPhase.saved,
         elapsed: Duration.zero,
-        statusMessage: 'Saved. Your note is organized and linked for later review.',
+        statusMessage: 'Saved. Your note is ready to review.',
         lastSavedNoteId: finalNote.id,
         clearPendingAudio: true,
         clearProcessingNoteId: true,
@@ -390,69 +182,66 @@ class RecordingController extends StateNotifier<RecordingState> {
 
       await _assistantController.celebrateSave();
     } catch (error) {
-      final failedAt = DateTime.now();
-      await _notesRepository.upsertProcessingJob(
-        ProcessingJob(
-          id: '$jobBaseId-failed',
-          userId: _currentUser.id,
-          noteId: noteId,
-          jobType: ProcessingJobType.noteGeneration,
-          status: ProcessingJobStatus.failed,
-          provider: _studyNoteGenerationService.providerKey,
-          errorMessage: error.toString(),
-          createdAt: now,
-          updatedAt: failedAt,
-        ),
-      );
-
-      await _notesRepository.upsertNote(
-        StudyNote(
-          id: noteId,
-          userId: _currentUser.id,
-          folderId: null,
-          sourceAudioUrl: null,
-          rawTranscript: '',
-          cleanedTitle: 'Processing failed',
-          cleanedSummary: 'This note needs a retry.',
-          cleanedContent:
-              'Something interrupted the pipeline. Retry the recording or inspect the backend configuration.',
-          keyIdeas: const <String>[],
-          reviewQuestions: const <String>[],
-          keyTerms: const <String>[],
-          tags: const <String>[],
-          topics: const <String>[],
-          relatedNoteIds: const <String>[],
-          aiProcessingStatus: NoteProcessingStatus.failed,
-          createdAt: now,
-          updatedAt: failedAt,
-          sourceDuration: pendingAudio.duration,
-        ),
-      );
-
-      _setError('Note processing failed. Try again or inspect provider setup.', error);
+      _setError('Note processing failed. Try again or inspect backend setup.', error);
     }
   }
 
-  Future<void> _backfillRelatedNoteIds(
-    StudyNote currentNote,
-    List<RelatedNoteMatch> relatedMatches,
-    List<StudyNote> existingNotes,
-  ) async {
-    for (final match in relatedMatches) {
-      final relatedNote = existingNotes.firstWhereOrNull(
-        (note) => note.id == match.noteId,
-      );
+  void _handleProgressUpdate(StudyNote note) {
+    state = state.copyWith(
+      phase: _phaseForNote(note),
+      statusMessage: _statusMessageForNote(note),
+      processingNoteId: note.id,
+      clearErrorMessage: true,
+    );
+  }
 
-      if (relatedNote == null || relatedNote.relatedNoteIds.contains(currentNote.id)) {
-        continue;
-      }
+  RecordingPhase _phaseForNote(StudyNote note) {
+    return switch (note.aiProcessingStatus) {
+      NoteProcessingStatus.uploading => RecordingPhase.uploading,
+      NoteProcessingStatus.transcribing => RecordingPhase.transcribing,
+      NoteProcessingStatus.generating => RecordingPhase.generating,
+      NoteProcessingStatus.organizing => RecordingPhase.organizing,
+      NoteProcessingStatus.ready => RecordingPhase.saving,
+      NoteProcessingStatus.failed => RecordingPhase.error,
+      _ => RecordingPhase.uploading,
+    };
+  }
 
-      await _notesRepository.upsertNote(
-        relatedNote.copyWith(
-          relatedNoteIds: [...relatedNote.relatedNoteIds, currentNote.id],
-        ),
-      );
+  String _statusMessageForNote(StudyNote note) {
+    return switch (note.aiProcessingStatus) {
+      NoteProcessingStatus.uploading =>
+        'Uploading audio to the backend and creating a note record...',
+      NoteProcessingStatus.transcribing =>
+        'Transcribing your recording with speech-to-text...',
+      NoteProcessingStatus.generating =>
+        'Turning the transcript into a structured study note...',
+      NoteProcessingStatus.organizing =>
+        'Finishing the note and organizing the result...',
+      NoteProcessingStatus.ready =>
+        'Structured note ready. Saving it into your review library...',
+      NoteProcessingStatus.failed =>
+        note.cleanedSummary.isNotEmpty ? note.cleanedSummary : 'The backend reported a failure.',
+      _ => 'Processing your recording...',
+    };
+  }
+
+  String _formatError(Object error) {
+    if (error is TimeoutException) {
+      return 'The backend is taking longer than expected. Check the note again in a moment.';
     }
+    return error.toString();
+  }
+
+  void _setError(String message, Object error) {
+    _stopTicker();
+    _startedAt = null;
+    _elapsedBeforePause = Duration.zero;
+    _assistantController.signalError();
+    state = state.copyWith(
+      phase: RecordingPhase.error,
+      statusMessage: message,
+      errorMessage: _formatError(error),
+    );
   }
 
   void _startTicker() {
@@ -471,18 +260,6 @@ class RecordingController extends StateNotifier<RecordingState> {
   void _stopTicker() {
     _ticker?.cancel();
     _ticker = null;
-  }
-
-  void _setError(String message, Object error) {
-    _stopTicker();
-    _startedAt = null;
-    _elapsedBeforePause = Duration.zero;
-    _assistantController.signalError();
-    state = state.copyWith(
-      phase: RecordingPhase.error,
-      statusMessage: message,
-      errorMessage: error.toString(),
-    );
   }
 
   @override

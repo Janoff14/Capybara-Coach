@@ -7,6 +7,9 @@ class AppEnvironment {
     required this.appFlavor,
     required this.useFirebase,
     required this.pipelineMode,
+    required this.apiBaseUrl,
+    required this.apiPollIntervalSeconds,
+    required this.apiReadyTimeoutSeconds,
     required this.demoUserId,
     required this.demoUserEmail,
     required this.demoUserName,
@@ -43,6 +46,18 @@ class AppEnvironment {
       pipelineMode: String.fromEnvironment(
         'PIPELINE_MODE',
         defaultValue: 'mock',
+      ),
+      apiBaseUrl: String.fromEnvironment(
+        'API_BASE_URL',
+        defaultValue: '',
+      ),
+      apiPollIntervalSeconds: int.fromEnvironment(
+        'API_POLL_INTERVAL_SECONDS',
+        defaultValue: 3,
+      ),
+      apiReadyTimeoutSeconds: int.fromEnvironment(
+        'API_READY_TIMEOUT_SECONDS',
+        defaultValue: 90,
       ),
       demoUserId: String.fromEnvironment(
         'DEMO_USER_ID',
@@ -99,6 +114,9 @@ class AppEnvironment {
   final String appFlavor;
   final bool useFirebase;
   final String pipelineMode;
+  final String apiBaseUrl;
+  final int apiPollIntervalSeconds;
+  final int apiReadyTimeoutSeconds;
   final String demoUserId;
   final String demoUserEmail;
   final String demoUserName;
@@ -116,6 +134,10 @@ class AppEnvironment {
   final String androidApplicationId;
   final String iosBundleId;
   final String functionsRegion;
+
+  bool get useFastApiPipeline {
+    return pipelineMode.toLowerCase() == 'fastapi' && apiBaseUrl.trim().isNotEmpty;
+  }
 
   bool get hasFirebaseCoreConfig {
     return firebaseApiKey.isNotEmpty &&

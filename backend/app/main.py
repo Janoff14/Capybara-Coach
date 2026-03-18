@@ -141,11 +141,14 @@ def list_notes(
     return [
         NoteListItem(
             id=note.id,
+            user_id=note.user_id,
+            folder_id=note.folder_id,
             title=note.title,
             summary=note.summary,
             processing_status=note.processing_status,
             folder_title=note.folder.title if note.folder else None,
             tags=[tag.name for tag in note.tags],
+            created_at=note.created_at,
             updated_at=note.updated_at,
         )
         for note in notes

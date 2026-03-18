@@ -51,9 +51,12 @@ class NoteRead(BaseModel):
 
 class NoteListItem(BaseModel):
     id: str
+    user_id: str
+    folder_id: str | None
     title: str
     summary: str | None
     processing_status: str
     folder_title: str | None
     tags: list[str]
+    created_at: datetime
     updated_at: datetime

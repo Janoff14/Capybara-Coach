@@ -65,11 +65,13 @@ C:\src\flutter\bin\flutter.bat analyze
 C:\src\flutter\bin\flutter.bat test
 ```
 
-Run on Android:
+Run on Android against Railway:
 
 ```bash
-C:\src\flutter\bin\flutter.bat run -d android
+C:\src\flutter\bin\flutter.bat run -d android --dart-define=PIPELINE_MODE=fastapi --dart-define=API_BASE_URL=https://YOUR-RAILWAY-BACKEND.up.railway.app
 ```
+
+The Flutter app expects compile-time defines for the backend URL. Use [.env.example](C:/Users/sanja/Shoki/.env.example) as the template for those values.
 
 ## Environment files
 
@@ -81,12 +83,17 @@ C:\src\flutter\bin\flutter.bat run -d android
 What is in place now:
 
 - Flutter app scaffold and recorder-first mobile route
+- Flutter recorder flow wired to the FastAPI upload and note-polling backend
 - FastAPI backend prototype with upload, transcription, note generation, note fetch, and folder listing
 - Railway-ready backend Dockerfile
 - Postgres-ready SQLAlchemy models
 
 What still needs wiring:
 
-- Flutter client calling the new FastAPI backend instead of local mock services
 - Auth beyond the demo user
 - Better job polling and retry UX
+
+Backend redeploy note:
+
+- Pull the latest backend changes and redeploy Railway before testing the updated Flutter client.
+- `GET /notes` now returns `user_id`, `folder_id`, and `created_at`, which the Flutter library view uses for cleaner mapping.
