@@ -9,7 +9,9 @@ import '../firebase/firebase_audio_storage_service.dart';
 import '../firebase/firebase_initializer.dart';
 import '../firebase/firebase_notes_repository.dart';
 import '../fastapi/capybara_coach_api_client.dart';
+import '../fastapi/fastapi_learning_repository.dart';
 import '../fastapi/fastapi_notes_repository.dart';
+import '../fastapi/fastapi_study_session_pipeline_service.dart';
 import '../fastapi/fastapi_voice_note_pipeline_service.dart';
 import '../local/recording_device_service.dart';
 import '../mock/mock_audio_storage_service.dart';
@@ -21,6 +23,7 @@ import '../mock/mock_notes_repository.dart';
 import '../mock/mock_related_notes_service.dart';
 import '../mock/mock_recall_evaluation_service.dart';
 import '../mock/mock_session_note_synthesis_service.dart';
+import '../mock/mock_study_session_pipeline_service.dart';
 import '../mock/mock_study_note_generation_service.dart';
 import '../mock/mock_transcription_service.dart';
 import '../mock/mock_voice_note_pipeline_service.dart';
@@ -60,13 +63,40 @@ class AppBootstrapper {
         : firebaseRuntime.enabled
         ? FirebaseNotesRepository()
         : MockNotesRepository.seeded(currentUser);
-    final learningRepository = MockLearningRepository.seeded(currentUser);
+    final learningRepository = useFastApiPipeline
+        ? FastApiLearningRepository(
+            currentUser: currentUser,
+            apiClient: apiClient!,
+            pollInterval: Duration(seconds: environment.apiPollIntervalSeconds),
+          )
+        : MockLearningRepository.seeded(currentUser);
     final mockAudioStorageService = const MockAudioStorageService();
     final mockTranscriptionService = const MockTranscriptionService();
-    final mockStudyNoteGenerationService = const MockStudyNoteGenerationService();
+    final mockStudyNoteGenerationService =
+        const MockStudyNoteGenerationService();
     final mockKnowledgeOrganizationService =
         const MockKnowledgeOrganizationService();
     final mockRelatedNotesService = const MockRelatedNotesService();
+    final mockDocumentParsingService = const MockDocumentParsingService();
+    final mockRecallEvaluationService = const MockRecallEvaluationService();
+    final mockSessionNoteSynthesisService =
+        const MockSessionNoteSynthesisService();
+
+    final studySessionPipelineService = useFastApiPipeline
+        ? FastApiStudySessionPipelineService(
+            apiClient: apiClient!,
+            notesRepository: notesRepository,
+          )
+        : MockStudySessionPipelineService(
+            notesRepository: notesRepository,
+            audioStorageService: mockAudioStorageService,
+            transcriptionService: mockTranscriptionService,
+            documentParsingService: mockDocumentParsingService,
+            recallEvaluationService: mockRecallEvaluationService,
+            sessionNoteSynthesisService: mockSessionNoteSynthesisService,
+            knowledgeOrganizationService: mockKnowledgeOrganizationService,
+            relatedNotesService: mockRelatedNotesService,
+          );
 
     final voiceNotePipelineService = useFastApiPipeline
         ? FastApiVoiceNotePipelineService(
@@ -96,12 +126,13 @@ class AppBootstrapper {
           ? FirebaseAudioStorageService(storage: FirebaseStorage.instance)
           : mockAudioStorageService,
       transcriptionService: mockTranscriptionService,
-      documentParsingService: const MockDocumentParsingService(),
-      recallEvaluationService: const MockRecallEvaluationService(),
-      sessionNoteSynthesisService: const MockSessionNoteSynthesisService(),
+      documentParsingService: mockDocumentParsingService,
+      recallEvaluationService: mockRecallEvaluationService,
+      sessionNoteSynthesisService: mockSessionNoteSynthesisService,
       studyNoteGenerationService: mockStudyNoteGenerationService,
       knowledgeOrganizationService: mockKnowledgeOrganizationService,
       relatedNotesService: mockRelatedNotesService,
+      studySessionPipelineService: studySessionPipelineService,
       voiceNotePipelineService: voiceNotePipelineService,
     );
   }

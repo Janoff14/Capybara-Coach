@@ -67,6 +67,7 @@ class DocumentSectionRead(BaseModel):
     title: str
     page_label: str
     order_index: int
+    extracted_text: str
     estimated_read_minutes: int
     difficulty: str
     concept_count: int

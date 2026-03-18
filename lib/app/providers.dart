@@ -21,6 +21,7 @@ import '../domain/services/auth_service.dart';
 import '../domain/services/learning_repository.dart';
 import '../domain/services/notes_repository.dart';
 import '../domain/services/pipeline_services.dart';
+import '../domain/services/study_session_pipeline_service.dart';
 import '../domain/services/voice_note_pipeline_service.dart';
 import 'app_dependencies.dart';
 import 'router.dart';
@@ -95,6 +96,10 @@ final voiceNotePipelineServiceProvider = Provider<VoiceNotePipelineService>(
   (ref) => ref.watch(appDependenciesProvider).voiceNotePipelineService,
 );
 
+final studySessionPipelineServiceProvider = Provider<StudySessionPipelineService>(
+  (ref) => ref.watch(appDependenciesProvider).studySessionPipelineService,
+);
+
 final assistantControllerProvider =
     StateNotifierProvider<AssistantController, AssistantMood>((ref) {
       return AssistantController();
@@ -115,19 +120,10 @@ final sessionFlowControllerProvider =
       return SessionFlowController(
         currentUser: ref.watch(currentUserProvider),
         learningRepository: ref.watch(learningRepositoryProvider),
-        notesRepository: ref.watch(notesRepositoryProvider),
         recordingDeviceService: ref.watch(recordingDeviceServiceProvider),
-        audioStorageService: ref.watch(audioStorageServiceProvider),
-        transcriptionService: ref.watch(transcriptionServiceProvider),
-        documentParsingService: ref.watch(documentParsingServiceProvider),
-        recallEvaluationService: ref.watch(recallEvaluationServiceProvider),
-        sessionNoteSynthesisService: ref.watch(
-          sessionNoteSynthesisServiceProvider,
+        studySessionPipelineService: ref.watch(
+          studySessionPipelineServiceProvider,
         ),
-        knowledgeOrganizationService: ref.watch(
-          knowledgeOrganizationServiceProvider,
-        ),
-        relatedNotesService: ref.watch(relatedNotesServiceProvider),
       );
     });
 

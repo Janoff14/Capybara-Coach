@@ -5,6 +5,7 @@ import '../domain/services/auth_service.dart';
 import '../domain/services/learning_repository.dart';
 import '../domain/services/notes_repository.dart';
 import '../domain/services/pipeline_services.dart';
+import '../domain/services/study_session_pipeline_service.dart';
 import '../domain/services/voice_note_pipeline_service.dart';
 
 class AppDependencies {
@@ -24,6 +25,7 @@ class AppDependencies {
     required this.studyNoteGenerationService,
     required this.knowledgeOrganizationService,
     required this.relatedNotesService,
+    required this.studySessionPipelineService,
     required this.voiceNotePipelineService,
   });
 
@@ -42,5 +44,6 @@ class AppDependencies {
   final StudyNoteGenerationService studyNoteGenerationService;
   final KnowledgeOrganizationService knowledgeOrganizationService;
   final RelatedNotesService relatedNotesService;
+  final StudySessionPipelineService studySessionPipelineService;
   final VoiceNotePipelineService voiceNotePipelineService;
 }

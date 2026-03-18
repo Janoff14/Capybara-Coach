@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 _TEMP_DIR = Path(tempfile.mkdtemp(prefix="capybara-coach-tests-")).resolve()
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TEMP_DIR / 'study_flow.db').as_posix()}"
@@ -112,6 +113,61 @@ class StudyFlowApiTests(unittest.TestCase):
         folders_response = self.client.get("/folders")
         self.assertEqual(folders_response.status_code, 200)
         self.assertEqual(len(folders_response.json()), 1)
+
+    def test_audio_evaluation_endpoint_updates_session(self) -> None:
+        source_text = (
+            "Caching stores expensive results so repeated requests can be served faster. "
+            "A cache hit returns stored data, while a cache miss requires recomputation."
+        )
+
+        import_response = self.client.post(
+            "/documents/import",
+            data={
+                "title": "Caching Basics",
+                "subtitle": "Performance review",
+                "raw_text": source_text,
+            },
+        )
+        imported_document = import_response.json()
+
+        session_response = self.client.post(
+            "/sessions",
+            json={
+                "document_id": imported_document["id"],
+                "section_id": imported_document["sections"][0]["id"],
+                "mode": "assisted",
+            },
+        )
+        created_session = session_response.json()
+
+        with patch(
+            "app.main.transcribe_file",
+            return_value={
+                "text": (
+                    "Caching stores expensive results so repeated requests are faster. "
+                    "A cache hit returns stored data and a cache miss recomputes it."
+                ),
+                "language_code": "en",
+                "provider": "faster-whisper",
+                "segments": [],
+            },
+        ):
+            evaluation_response = self.client.post(
+                f"/sessions/{created_session['id']}/evaluate-audio",
+                files={"audio": ("attempt.m4a", b"fake-audio", "audio/mp4")},
+                data={"actual_read_seconds": "180"},
+            )
+
+        self.assertEqual(evaluation_response.status_code, 200)
+        evaluated_session = evaluation_response.json()
+        self.assertEqual(evaluated_session["status"], "feedback_ready")
+        self.assertEqual(
+            evaluated_session["recall_transcript"],
+            "Caching stores expensive results so repeated requests are faster. "
+            "A cache hit returns stored data and a cache miss recomputes it.",
+        )
+        self.assertEqual(evaluated_session["actual_read_seconds"], 180)
+        self.assertGreaterEqual(evaluated_session["score_total"], 70)
 
 
 if __name__ == "__main__":

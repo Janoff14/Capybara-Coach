@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../presentation/screens/capture/capture_screen.dart';
 import '../presentation/screens/dashboard/dashboard_screen.dart';
 import '../presentation/screens/folders/folder_detail_screen.dart';
 import '../presentation/screens/library/library_screen.dart';
@@ -25,8 +24,7 @@ GoRouter buildRouter(Ref ref) {
         routes: [
           GoRoute(
             path: '/capture',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage<void>(child: CaptureScreen()),
+            redirect: (context, state) => '/dashboard',
           ),
           GoRoute(
             path: '/dashboard',

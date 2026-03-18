@@ -37,7 +37,7 @@ class LibraryScreen extends ConsumerWidget {
           Text(
             kIsWeb
                 ? 'Browse folders, open earned notes, and review linked material. Session creation stays on mobile.'
-                : 'Review the notes users earned after passing recall, and search by terms, tags, or topics.',
+                : 'Review the notes you earned after passing recall, and search by terms, tags, or topics.',
           ),
           const SizedBox(height: AppSpacing.lg),
           TextField(

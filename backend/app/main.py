@@ -19,7 +19,14 @@ from .models import (
     StudySession,
     Transcript,
 )
-from .pipeline import ensure_user, generate_note, process_upload_pipeline, save_upload_file, transcribe_upload
+from .pipeline import (
+    ensure_user,
+    generate_note,
+    process_upload_pipeline,
+    save_upload_file,
+    transcribe_file,
+    transcribe_upload,
+)
 from .schemas import (
     DocumentListItem,
     DocumentRead,
@@ -391,6 +398,47 @@ def evaluate_session(
     return _serialize_study_session(loaded)
 
 
+@app.post("/sessions/{session_id}/evaluate-audio", response_model=StudySessionRead)
+def evaluate_session_audio(
+    session_id: str,
+    audio: UploadFile = File(...),
+    actual_read_seconds: int | None = Form(default=None),
+    db: Session = Depends(get_db),
+) -> StudySessionRead:
+    study_session = _load_study_session(db, session_id)
+    if study_session is None:
+        raise HTTPException(status_code=404, detail="Study session not found.")
+
+    stored_path = save_upload_file(audio, settings)
+    try:
+        transcript = transcribe_file(stored_path)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        temp_file = Path(stored_path)
+        if temp_file.exists():
+            temp_file.unlink()
+
+    transcript_text = transcript["text"].strip()
+    if not transcript_text:
+        raise HTTPException(status_code=400, detail="No speech was detected in the audio.")
+
+    updated = evaluate_session_recall(
+        session=db,
+        study_session=study_session,
+        recall_text=transcript_text,
+        actual_read_seconds=actual_read_seconds,
+    )
+
+    loaded = _load_study_session(db, updated.id)
+    if loaded is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Evaluated study session could not be loaded.",
+        )
+    return _serialize_study_session(loaded)
+
+
 @app.post("/sessions/{session_id}/generate-note", response_model=StudySessionNoteResponse)
 def generate_session_note_endpoint(
     session_id: str,
@@ -528,6 +576,7 @@ def _serialize_document(document: Document) -> DocumentRead:
                 title=section.title,
                 page_label=section.page_label,
                 order_index=section.order_index,
+                extracted_text=section.extracted_text,
                 estimated_read_minutes=section.estimated_read_minutes,
                 difficulty=section.difficulty,
                 concept_count=section.concept_count,

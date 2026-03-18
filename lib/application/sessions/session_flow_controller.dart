@@ -1,62 +1,34 @@
 import 'dart:async';
+import 'dart:convert';
 
-import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as path;
-import 'package:uuid/uuid.dart';
 
 import '../../domain/models/app_user.dart';
-import '../../domain/models/folder_entity.dart';
 import '../../domain/models/learning_session.dart';
 import '../../domain/models/learning_source.dart';
-import '../../domain/models/note_generation.dart';
-import '../../domain/models/note_link_entity.dart';
-import '../../domain/models/note_processing.dart';
-import '../../domain/models/study_note.dart';
 import '../../domain/services/learning_repository.dart';
-import '../../domain/services/notes_repository.dart';
 import '../../domain/services/pipeline_services.dart';
+import '../../domain/services/study_session_pipeline_service.dart';
 import 'session_flow_state.dart';
 
 class SessionFlowController extends StateNotifier<SessionFlowState> {
   SessionFlowController({
     required AppUser currentUser,
     required LearningRepository learningRepository,
-    required NotesRepository notesRepository,
     required RecordingDeviceService recordingDeviceService,
-    required AudioStorageService audioStorageService,
-    required TranscriptionService transcriptionService,
-    required DocumentParsingService documentParsingService,
-    required RecallEvaluationService recallEvaluationService,
-    required SessionNoteSynthesisService sessionNoteSynthesisService,
-    required KnowledgeOrganizationService knowledgeOrganizationService,
-    required RelatedNotesService relatedNotesService,
+    required StudySessionPipelineService studySessionPipelineService,
   }) : _currentUser = currentUser,
        _learningRepository = learningRepository,
-       _notesRepository = notesRepository,
        _recordingDeviceService = recordingDeviceService,
-       _audioStorageService = audioStorageService,
-       _transcriptionService = transcriptionService,
-       _documentParsingService = documentParsingService,
-       _recallEvaluationService = recallEvaluationService,
-       _sessionNoteSynthesisService = sessionNoteSynthesisService,
-       _knowledgeOrganizationService = knowledgeOrganizationService,
-       _relatedNotesService = relatedNotesService,
+       _studySessionPipelineService = studySessionPipelineService,
        super(const SessionFlowState.initial());
 
-  final _uuid = const Uuid();
   final AppUser _currentUser;
   final LearningRepository _learningRepository;
-  final NotesRepository _notesRepository;
   final RecordingDeviceService _recordingDeviceService;
-  final AudioStorageService _audioStorageService;
-  final TranscriptionService _transcriptionService;
-  final DocumentParsingService _documentParsingService;
-  final RecallEvaluationService _recallEvaluationService;
-  final SessionNoteSynthesisService _sessionNoteSynthesisService;
-  final KnowledgeOrganizationService _knowledgeOrganizationService;
-  final RelatedNotesService _relatedNotesService;
+  final StudySessionPipelineService _studySessionPipelineService;
 
   Timer? _readingTicker;
   Timer? _recallTicker;
@@ -79,7 +51,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
     );
 
     try {
-      final source = await _documentParsingService.importSource(
+      final source = await _studySessionPipelineService.importDocument(
         user: _currentUser,
         sourceType: LearningSourceType.text,
         title: title,
@@ -89,7 +61,8 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       await _learningRepository.upsertSource(source);
       state = state.copyWith(
         isImporting: false,
-        statusMessage: 'Source imported. Choose a section and start a session.',
+        statusMessage:
+            'Source imported. Pick the exact section you want to study today.',
       );
     } catch (error) {
       _setError('Could not import the pasted text.', error);
@@ -120,31 +93,37 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
 
       final file = result.files.single;
       final extension = path.extension(file.name).toLowerCase();
-      String? rawText;
+      final sourceType = extension == '.pdf'
+          ? LearningSourceType.pdf
+          : LearningSourceType.text;
 
-      if (extension == '.txt') {
-        if (file.bytes != null) {
-          rawText = String.fromCharCodes(file.bytes!);
-        }
+      final fileBytes = file.bytes;
+      if (fileBytes == null || fileBytes.isEmpty) {
+        throw StateError(
+          'The selected file could not be read. Try a smaller file or paste the text directly.',
+        );
       }
 
-      final source = await _documentParsingService.importSource(
+      final rawText = extension == '.txt'
+          ? utf8.decode(fileBytes, allowMalformed: true)
+          : null;
+
+      final source = await _studySessionPipelineService.importDocument(
         user: _currentUser,
-        sourceType: extension == '.pdf'
-            ? LearningSourceType.pdf
-            : LearningSourceType.text,
+        sourceType: sourceType,
         title: path.basenameWithoutExtension(file.name),
         subtitle: extension == '.pdf'
             ? 'Uploaded document'
             : 'Imported text file',
         rawText: rawText,
+        fileBytes: extension == '.pdf' ? fileBytes : null,
         fileName: file.name,
       );
       await _learningRepository.upsertSource(source);
 
       state = state.copyWith(
         isImporting: false,
-        statusMessage: 'File imported. Pick a chapter or section to learn.',
+        statusMessage: 'File imported. Choose a section and create a session.',
       );
     } catch (error) {
       _setError('Could not import the selected file.', error);
@@ -156,44 +135,31 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
     required LearningSection section,
     required LearningSessionMode mode,
   }) async {
-    final session = LearningSession(
-      id: _uuid.v4(),
-      userId: _currentUser.id,
-      sourceId: source.id,
-      sourceTitle: source.title,
-      sourceType: source.type,
-      sectionId: section.id,
-      sectionTitle: section.title,
-      mode: mode,
-      phase: LearningSessionPhase.reading,
-      sourceText: section.extractedText,
-      targetReadDuration: Duration(minutes: section.estimatedReadMinutes),
-      actualReadDuration: Duration.zero,
-      attemptCount: 0,
-      recallPrompt: _promptForMode(mode),
-      recallTranscript: null,
-      feedback: null,
-      noteId: null,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      errorMessage: null,
-    );
+    try {
+      final session = await _studySessionPipelineService.createSession(
+        user: _currentUser,
+        source: source,
+        section: section,
+        mode: mode,
+      );
+      await _learningRepository.upsertSession(session);
+      _readingBase = Duration.zero;
+      _recallBase = Duration.zero;
+      _startReadingTicker();
 
-    await _learningRepository.upsertSession(session);
-    _readingBase = Duration.zero;
-    _recallBase = Duration.zero;
-    _startReadingTicker();
-
-    state = state.copyWith(
-      activeSession: session,
-      readingElapsed: Duration.zero,
-      recallElapsed: Duration.zero,
-      clearPendingRecallAudio: true,
-      clearLastGeneratedNoteId: true,
-      clearErrorMessage: true,
-      statusMessage:
-          'Read first. When you finish, the document disappears and recall starts from memory only.',
-    );
+      state = state.copyWith(
+        activeSession: session,
+        readingElapsed: Duration.zero,
+        recallElapsed: Duration.zero,
+        clearPendingRecallAudio: true,
+        clearLastGeneratedNoteId: true,
+        clearErrorMessage: true,
+        statusMessage:
+            'Read first. When you finish, the document disappears and recall starts from memory only.',
+      );
+    } catch (error) {
+      _setError('Could not create the study session.', error);
+    }
   }
 
   Future<void> markReadingComplete() async {
@@ -207,6 +173,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       phase: LearningSessionPhase.readyToRecall,
       actualReadDuration: state.readingElapsed,
       updatedAt: DateTime.now(),
+      clearErrorMessage: true,
     );
     await _learningRepository.upsertSession(updated);
     state = state.copyWith(
@@ -232,6 +199,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       final updated = session.copyWith(
         phase: LearningSessionPhase.recordingRecall,
         updatedAt: DateTime.now(),
+        clearErrorMessage: true,
       );
       await _learningRepository.upsertSession(updated);
       state = state.copyWith(
@@ -260,12 +228,14 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       final updated = session.copyWith(
         phase: LearningSessionPhase.reviewRecording,
         updatedAt: DateTime.now(),
+        clearErrorMessage: true,
       );
       await _learningRepository.upsertSession(updated);
       state = state.copyWith(
         activeSession: updated,
         pendingRecallAudio: audio,
-        statusMessage: 'Good. Submit this attempt to score the recall against the document.',
+        statusMessage:
+            'Good. Submit this attempt to score the recall against the document.',
       );
     } catch (error) {
       _setError('Could not finalize recall recording.', error);
@@ -282,6 +252,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
     final updated = session.copyWith(
       phase: LearningSessionPhase.readyToRecall,
       updatedAt: DateTime.now(),
+      clearErrorMessage: true,
     );
     await _learningRepository.upsertSession(updated);
     state = state.copyWith(
@@ -305,55 +276,32 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
     try {
       final transcribingSession = session.copyWith(
         phase: LearningSessionPhase.transcribing,
-        attemptCount: session.attemptCount + 1,
         updatedAt: DateTime.now(),
+        clearErrorMessage: true,
       );
       await _learningRepository.upsertSession(transcribingSession);
       state = state.copyWith(
         activeSession: transcribingSession,
         isWorking: true,
-        statusMessage: 'Turning the oral retelling into text...',
+        statusMessage:
+            'Turning the oral retelling into text and scoring it against the source...',
         clearErrorMessage: true,
       );
 
-      final stored = await _audioStorageService.upload(
-        user: _currentUser,
-        recording: audio,
-      );
-      final transcript = await _transcriptionService.transcribe(
-        user: _currentUser,
-        audio: stored,
-        duration: audio.duration,
-      );
-
-      final evaluatingSession = transcribingSession.copyWith(
-        phase: LearningSessionPhase.evaluating,
-        recallTranscript: transcript.text,
-        updatedAt: DateTime.now(),
-      );
-      await _learningRepository.upsertSession(evaluatingSession);
-      state = state.copyWith(
-        activeSession: evaluatingSession,
-        statusMessage: 'Comparing the retelling against the source material...',
-      );
-
-      final feedback = await _recallEvaluationService.evaluate(
-        session: evaluatingSession,
-        recallTranscript: transcript.text,
-      );
-
-      final feedbackSession = evaluatingSession.copyWith(
-        phase: LearningSessionPhase.feedbackReady,
-        feedback: feedback,
-        updatedAt: DateTime.now(),
-      );
-      await _learningRepository.upsertSession(feedbackSession);
+      final evaluatedSession = await _studySessionPipelineService
+          .evaluateRecallAudio(
+            user: _currentUser,
+            session: transcribingSession,
+            recording: audio,
+            actualReadDuration: state.readingElapsed,
+          );
+      await _learningRepository.upsertSession(evaluatedSession);
 
       state = state.copyWith(
-        activeSession: feedbackSession,
+        activeSession: evaluatedSession,
         isWorking: false,
         clearPendingRecallAudio: true,
-        statusMessage: feedback.canPass
+        statusMessage: evaluatedSession.feedback?.canPass ?? false
             ? 'You passed the recall gate. Generate the corrected note when ready.'
             : 'Retry recommended. The recall is still missing too much of the source.',
       );
@@ -373,6 +321,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       clearRecallTranscript: true,
       clearFeedback: true,
       updatedAt: DateTime.now(),
+      clearErrorMessage: true,
     );
     await _learningRepository.upsertSession(updated);
 
@@ -396,112 +345,28 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       final generatingSession = session.copyWith(
         phase: LearningSessionPhase.generatingNote,
         updatedAt: DateTime.now(),
+        clearErrorMessage: true,
       );
       await _learningRepository.upsertSession(generatingSession);
       state = state.copyWith(
         activeSession: generatingSession,
         isWorking: true,
-        statusMessage: 'Building a corrected study note from the retelling plus the source...',
+        statusMessage:
+            'Building a corrected study note from the retelling plus the source...',
       );
 
-      final generated = await _sessionNoteSynthesisService.synthesize(
+      final result = await _studySessionPipelineService.generateNote(
+        user: _currentUser,
         session: generatingSession,
-        feedback: feedback,
       );
-
-      final folders = await _notesRepository.listFolders(_currentUser.id);
-      final existingNotes = await _notesRepository.listNotes(_currentUser.id);
-
-      final organizationPlan = await _knowledgeOrganizationService.organize(
-        context: KnowledgeOrganizationContext(
-          user: _currentUser,
-          generatedNote: generated,
-          existingFolders: folders,
-          existingNotes: existingNotes,
-        ),
-      );
-
-      FolderEntity? folder = folders
-          .where(
-            (candidate) =>
-                candidate.title.toLowerCase() ==
-                organizationPlan.folderTitle.toLowerCase(),
-          )
-          .firstOrNull;
-
-      if (folder == null && organizationPlan.createNewFolder) {
-        folder = FolderEntity(
-          id: _uuid.v4(),
-          userId: _currentUser.id,
-          title: organizationPlan.folderTitle,
-          description: organizationPlan.folderDescription,
-          parentFolderId: null,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          aiGenerated: true,
-        );
-        await _notesRepository.upsertFolder(folder);
-      }
-
-      final note = StudyNote(
-        id: _uuid.v4(),
-        userId: _currentUser.id,
-        folderId: folder?.id,
-        sourceAudioUrl: null,
-        rawTranscript: session.recallTranscript ?? '',
-        cleanedTitle: generated.title,
-        cleanedSummary: generated.summary,
-        cleanedContent: generated.cleanedContent,
-        keyIdeas: generated.keyIdeas,
-        reviewQuestions: generated.reviewQuestions,
-        keyTerms: generated.importantTerms,
-        tags: {...generated.tags, ...organizationPlan.tags}.toList()..sort(),
-        topics: {...generated.topics, ...organizationPlan.topics}.toList()
-          ..sort(),
-        relatedNoteIds: const [],
-        aiProcessingStatus: NoteProcessingStatus.ready,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        sourceDuration: state.recallElapsed,
-      );
-
-      final relatedMatches = await _relatedNotesService.findRelated(
-        context: RelatedNotesContext(
-          currentNote: note,
-          existingNotes: existingNotes,
-        ),
-      );
-
-      final finalNote = note.copyWith(
-        relatedNoteIds: relatedMatches.map((match) => match.noteId).toList(),
-      );
-      await _notesRepository.upsertNote(finalNote);
-      await _notesRepository
-          .replaceLinksForNote(_currentUser.id, finalNote.id, [
-            for (final match in relatedMatches)
-              NoteLinkEntity(
-                id: _uuid.v4(),
-                userId: _currentUser.id,
-                fromNoteId: finalNote.id,
-                toNoteId: match.noteId,
-                relationType: match.relationType,
-                score: match.score,
-                createdAt: DateTime.now(),
-              ),
-          ]);
-
-      final completeSession = generatingSession.copyWith(
-        phase: LearningSessionPhase.complete,
-        noteId: finalNote.id,
-        updatedAt: DateTime.now(),
-      );
-      await _learningRepository.upsertSession(completeSession);
+      await _learningRepository.upsertSession(result.session);
 
       state = state.copyWith(
-        activeSession: completeSession,
+        activeSession: result.session,
         isWorking: false,
-        lastGeneratedNoteId: finalNote.id,
-        statusMessage: 'Session complete. Your corrected note is saved for review.',
+        lastGeneratedNoteId: result.note.id,
+        statusMessage:
+            'Session complete. Your corrected note is saved for review.',
       );
     } catch (error) {
       _setError('Could not generate the review note.', error);
@@ -519,15 +384,6 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       statusMessage:
           'Upload a document, read a focused section, then prove you learned it.',
     );
-  }
-
-  String _promptForMode(LearningSessionMode mode) {
-    return switch (mode) {
-      LearningSessionMode.assisted =>
-        'Explain what you just read in your own words. What are the key ideas and what would someone misunderstand?',
-      LearningSessionMode.strict =>
-        'Retell the section from memory with definitions, edge cases, names, examples, and precise distinctions.',
-    };
   }
 
   void _startReadingTicker() {

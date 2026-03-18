@@ -776,7 +776,7 @@ class _ReadingPhase extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'Read first. Do not retell yet. While the user reads, the app can already prepare the source structure in the background.',
+            'Read the section first. Do not retell yet. Use the timer as a guide, not a deadline.',
           ),
           const SizedBox(height: AppSpacing.lg),
           Container(
@@ -1218,7 +1218,7 @@ class _FeedbackPhase extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             feedback.canPass
-                ? 'Passed. The user cleared the 70-point recall gate and can now turn this into a corrected note.'
+                ? 'Passed. You cleared the 70-point recall gate and can now turn this into a corrected note.'
                 : 'Below threshold. Retry is recommended before the note unlocks.',
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -1498,7 +1498,7 @@ class _CompletePhase extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'The note is now saved with the user recall preserved, the missing concepts corrected, and future review prompts attached.',
+            'Your note is now saved with your own recall preserved, the missing concepts corrected, and future review prompts attached.',
           ),
           const SizedBox(height: AppSpacing.lg),
           if (note != null)
@@ -1586,7 +1586,7 @@ class _ErrorPhase extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'Reset this session and start again. Provider interfaces are already isolated, so backend failures can be swapped or retried later without rewriting the UI.',
+            'Reset this session and start again. If the problem keeps happening, reopen the app or check the backend connection.',
           ),
           const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
