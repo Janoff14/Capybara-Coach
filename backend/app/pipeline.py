@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -56,17 +57,25 @@ def _load_whisper_model():
         from faster_whisper import WhisperModel
     except ImportError as exc:  # pragma: no cover - import guard
         raise RuntimeError(
-            "faster-whisper is not installed. Install backend requirements before transcribing."
+            "Local faster-whisper transcription is unavailable. "
+            "Install backend requirements correctly or configure STT_PROVIDER=openai "
+            "with STT_API_KEY (or reuse LLM_API_KEY) for a cloud fallback."
         ) from exc
 
-    return WhisperModel(
-        settings.faster_whisper_model,
-        device=settings.faster_whisper_device,
-        compute_type=settings.faster_whisper_compute_type,
-    )
+    try:
+        return WhisperModel(
+            settings.faster_whisper_model,
+            device=settings.faster_whisper_device,
+            compute_type=settings.faster_whisper_compute_type,
+        )
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        raise RuntimeError(
+            "Local faster-whisper transcription failed to initialize. "
+            "Set STT_PROVIDER=openai on Railway to use the remote speech-to-text fallback."
+        ) from exc
 
 
-def transcribe_file(audio_path: str) -> dict:
+def _transcribe_with_faster_whisper(audio_path: str) -> dict:
     model = _load_whisper_model()
     segments, info = model.transcribe(audio_path)
     collected_segments: list[dict] = []
@@ -91,6 +100,76 @@ def transcribe_file(audio_path: str) -> dict:
         "provider": "faster-whisper",
         "segments": collected_segments,
     }
+
+
+def _transcribe_with_openai(audio_path: str, settings: Settings) -> dict:
+    base_url = (settings.stt_base_url or settings.llm_base_url).rstrip("/")
+    api_key = settings.stt_api_key or settings.llm_api_key
+    if not api_key:
+        raise RuntimeError(
+            "Remote speech-to-text fallback requires STT_API_KEY or LLM_API_KEY."
+        )
+
+    mime_type = mimetypes.guess_type(audio_path)[0] or "application/octet-stream"
+    with open(audio_path, "rb") as audio_file:
+        files = {
+            "file": (Path(audio_path).name, audio_file, mime_type),
+        }
+        data = {
+            "model": settings.stt_model,
+        }
+        with httpx.Client(
+            base_url=base_url,
+            timeout=settings.stt_timeout_seconds,
+            headers={"Authorization": f"Bearer {api_key}"},
+        ) as client:
+            response = client.post(
+                "audio/transcriptions",
+                files=files,
+                data=data,
+            )
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                detail = exc.response.text.strip()
+                if detail:
+                    raise RuntimeError(
+                        f"Remote speech-to-text request failed: {detail}"
+                    ) from exc
+                raise RuntimeError("Remote speech-to-text request failed.") from exc
+            payload = response.json()
+
+    return {
+        "text": str(payload.get("text") or "").strip(),
+        "language_code": str(payload.get("language") or "en"),
+        "provider": settings.stt_model,
+        "segments": payload.get("segments") or [],
+    }
+
+
+def transcribe_file(audio_path: str, settings: Settings | None = None) -> dict:
+    runtime = settings or get_settings()
+    provider = runtime.stt_provider.strip().lower()
+
+    if provider == "local":
+        return _transcribe_with_faster_whisper(audio_path)
+    if provider == "openai":
+        return _transcribe_with_openai(audio_path, runtime)
+
+    local_error: Exception | None = None
+    try:
+        return _transcribe_with_faster_whisper(audio_path)
+    except Exception as exc:
+        local_error = exc
+
+    if runtime.stt_api_key or runtime.llm_api_key:
+        return _transcribe_with_openai(audio_path, runtime)
+
+    detail = str(local_error) if local_error else "Local transcription failed."
+    raise RuntimeError(
+        f"{detail} No remote STT fallback is configured. "
+        "Set STT_PROVIDER=openai or auto and provide STT_API_KEY/LLM_API_KEY."
+    )
 
 
 def _request_llm_json(transcript: str, settings: Settings) -> dict | None:
@@ -138,7 +217,7 @@ Rules:
             "Content-Type": "application/json",
         },
     ) as client:
-        response = client.post("/chat/completions", json=payload)
+        response = client.post("chat/completions", json=payload)
         response.raise_for_status()
         data = response.json()
 

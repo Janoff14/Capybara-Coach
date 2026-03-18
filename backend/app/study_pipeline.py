@@ -435,7 +435,7 @@ Rules:
             "Content-Type": "application/json",
         },
     ) as client:
-        response = client.post("/chat/completions", json=payload)
+        response = client.post("chat/completions", json=payload)
         response.raise_for_status()
         data = response.json()
 

@@ -133,7 +133,7 @@ def transcribe_audio(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return _serialize_transcript(transcript)
 
@@ -413,7 +413,7 @@ def evaluate_session_audio(
     try:
         transcript = transcribe_file(stored_path)
     except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     finally:
         temp_file = Path(stored_path)
         if temp_file.exists():

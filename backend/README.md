@@ -3,7 +3,7 @@
 Minimal FastAPI prototype for the core voice-note loop:
 
 1. Upload audio
-2. Transcribe with `faster-whisper`
+2. Transcribe with `faster-whisper` locally or a cloud STT fallback on deploy
 3. Generate a structured note with one LLM API
 4. Save note, tags, and folder suggestion
 5. Fetch the finished note back from the API
@@ -31,6 +31,9 @@ pip install -r requirements.txt
    - keep `DATABASE_URL=sqlite:///./capybara_coach.db`
    Railway deploy:
    - replace it with Railway Postgres `DATABASE_URL`
+   STT recommendation:
+   - local dev: keep `STT_PROVIDER=auto` to prefer local `faster-whisper`
+   - Railway deploy: use `STT_PROVIDER=openai` so transcription does not depend on local model binaries in the container
 4. Start the API:
 
 ```bash
@@ -49,6 +52,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1
 - Attach a Postgres database.
 - Add a volume and set `STORAGE_DIR=/data`.
 - Set `DATABASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`.
+- For Railway, also set:
+  - `STT_PROVIDER=openai`
+  - `STT_BASE_URL=https://api.openai.com/v1`
+  - `STT_MODEL=gpt-4o-mini-transcribe`
+  - `STT_API_KEY` only if you want a separate key; otherwise it will reuse `LLM_API_KEY`
 - Railway can build from the included `Dockerfile`.
 
 ## Core endpoints

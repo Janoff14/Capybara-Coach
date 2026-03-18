@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     demo_user_id: str = "demo-user"
     demo_user_email: str = "student@capybaracoach.local"
     demo_user_name: str = "Demo Student"
+    stt_provider: str = "auto"
+    stt_base_url: str | None = None
+    stt_api_key: str | None = None
+    stt_model: str = "gpt-4o-mini-transcribe"
+    stt_timeout_seconds: float = 300.0
     faster_whisper_model: str = "small"
     faster_whisper_device: str = "cpu"
     faster_whisper_compute_type: str = "int8"
