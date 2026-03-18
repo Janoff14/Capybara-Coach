@@ -89,7 +89,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             children: [
               Text(
                 activeSession == null
-                    ? 'Create a learning session'
+                    ? 'Upload material and create a session'
                     : 'Active recall session',
                 style: Theme.of(
                   context,
@@ -98,8 +98,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 activeSession == null
-                    ? 'Upload a PDF or text source, pick the chapter you want today, and let the app prepare the recall gate in the background.'
-                    : 'The reading comes first. Then the text disappears and the user has to retell it from memory.',
+                    ? 'First add a document. Then choose the exact section or page range for today and start a focused read.'
+                    : 'Read first, hide the document, retell it from memory, then cross the score gate before notes unlock.',
               ),
               const SizedBox(height: AppSpacing.lg),
               _StatusStrip(
@@ -302,14 +302,14 @@ class _ImportPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Upload',
+            '1. Upload document',
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'Start with a PDF or text. The parser breaks it into sections so the user can choose only the pages or chapter they want today.',
+            'Start with a PDF or text. The parser breaks it into sections so the user can choose only the chapter, page range, or part they want today.',
           ),
           const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
@@ -393,14 +393,14 @@ class _SourcePickerPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Choose what to learn today',
+            '2. Create session',
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'The session always starts with a section selection. That keeps reading time intentional and makes scoring fair.',
+            'Pick the exact section for today, choose assisted or strict mode, and launch the reading timer.',
           ),
           const SizedBox(height: AppSpacing.md),
           if (sources.isEmpty)
@@ -412,7 +412,7 @@ class _SourcePickerPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
               ),
               child: const Text(
-                'Imported sources will appear here. Seeded demo topics are available in demo mode as soon as the repository loads.',
+                'Imported sources will appear here. Once a document exists, the user can choose a section and start a session immediately.',
               ),
             )
           else
@@ -537,12 +537,12 @@ class _SectionActionCard extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onAssisted,
                 icon: const Icon(Icons.auto_awesome_outlined),
-                label: const Text('Assisted'),
+                label: const Text('Create assisted session'),
               ),
               OutlinedButton.icon(
                 onPressed: onStrict,
                 icon: const Icon(Icons.gpp_good_outlined),
-                label: const Text('Strict'),
+                label: const Text('Create strict session'),
               ),
             ],
           ),
@@ -727,10 +727,10 @@ class _SessionHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('Session rule', style: Theme.of(context).textTheme.titleMedium),
+          Text('Pass gate', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'The user does not get the note until they cross the recall threshold. That keeps the note earned instead of passively consumed.',
+            'The note stays locked until the user reaches 70 out of 100. That keeps notes earned through recall instead of passively copied from the document.',
           ),
         ],
       ),
@@ -776,7 +776,7 @@ class _ReadingPhase extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'Read first. No note-taking here. The goal is to understand enough that you can later explain it without the text in front of you.',
+            'Read first. Do not retell yet. While the user reads, the app can already prepare the source structure in the background.',
           ),
           const SizedBox(height: AppSpacing.lg),
           Container(
@@ -829,6 +829,11 @@ class _ReadingPhase extends StatelessWidget {
                     if (section != null)
                       Chip(
                         backgroundColor: Colors.white,
+                        label: Text(section!.pageLabel),
+                      ),
+                    if (section != null)
+                      Chip(
+                        backgroundColor: Colors.white,
                         label: Text(section!.difficulty.label),
                       ),
                   ],
@@ -850,10 +855,34 @@ class _ReadingPhase extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'When you finish',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Tap finish reading. The document disappears and the recall recorder takes over, so the brain has to work without the text in view.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
           FilledButton.icon(
             onPressed: () => onReady(),
             icon: const Icon(Icons.visibility_off_outlined),
-            label: const Text("I'm Ready"),
+            label: const Text('Finish reading and start recall'),
           ),
         ],
       ),
@@ -903,14 +932,33 @@ class _RecallPhase extends StatelessWidget {
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            session.recallPrompt,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'The text is hidden now. Pull from memory, use your own wording, and aim for definitions, examples, distinctions, and edge cases.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.paper,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Prompt',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  session.recallPrompt,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Explain what you read in your own words as if you are retelling it out loud to make notes. Aim for key ideas, correct definitions, terms, names, dates, examples, and important distinctions.',
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           if (!recorderSupported)
@@ -952,7 +1000,7 @@ class _RecallPhase extends StatelessWidget {
                         ? 'Retelling from memory'
                         : isReview
                         ? 'Attempt ready for scoring'
-                        : 'Tap the mic when the user is ready',
+                        : 'Tap record when you are ready to retell',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.78),
                     ),
@@ -1006,19 +1054,19 @@ class _RecallPhase extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: recorderSupported ? onStartRecall : null,
                   icon: const Icon(Icons.mic_none_rounded),
-                  label: const Text('Start retelling'),
+                  label: const Text('Start oral retelling'),
                 ),
               if (isRecording)
                 FilledButton.icon(
                   onPressed: () => onStopRecall(),
                   icon: const Icon(Icons.stop_circle_outlined),
-                  label: const Text('Stop retelling'),
+                  label: const Text('Done speaking'),
                 ),
               if (isReview)
                 FilledButton.icon(
                   onPressed: () => onSubmitRecall(),
                   icon: const Icon(Icons.analytics_outlined),
-                  label: const Text('Score this attempt'),
+                  label: const Text('Score my attempt'),
                 ),
               if (isReview)
                 OutlinedButton.icon(
@@ -1078,7 +1126,7 @@ class _ProcessingPhase extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const Text(
-            'The evaluator compares the recall transcript with the original reading, then the note generator builds a corrected review note only if the user passed the gate.',
+            'Speech becomes text first. Then the evaluator compares the retelling against the source document and decides whether the note is earned yet.',
           ),
           const SizedBox(height: AppSpacing.lg),
           const Center(
@@ -1170,8 +1218,8 @@ class _FeedbackPhase extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           Text(
             feedback.canPass
-                ? 'Passed. The user cleared the recall gate and can now turn this into a corrected note.'
-                : 'Below threshold. The user should retry before the note is unlocked.',
+                ? 'Passed. The user cleared the 70-point recall gate and can now turn this into a corrected note.'
+                : 'Below threshold. Retry is recommended before the note unlocks.',
           ),
           const SizedBox(height: AppSpacing.lg),
           Wrap(
@@ -1184,7 +1232,7 @@ class _FeedbackPhase extends StatelessWidget {
                 accent: feedback.canPass ? AppColors.success : AppColors.coral,
               ),
               _ScoreCard(
-                label: 'Recall',
+                label: 'Key ideas',
                 value: '${feedback.breakdown.recallScore}/100',
                 accent: AppColors.ocean,
               ),
@@ -1194,13 +1242,38 @@ class _FeedbackPhase extends StatelessWidget {
                 accent: AppColors.mint,
               ),
               _ScoreCard(
-                label: 'Detail',
+                label: 'Terms and detail',
                 value: '${feedback.breakdown.detailScore}/100',
                 accent: AppColors.sun,
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              Chip(
+                avatar: const Icon(Icons.rule_rounded, size: 18),
+                label: Text('Pass gate: ${feedback.thresholdScore}/100'),
+              ),
+              Chip(
+                avatar: const Icon(Icons.warning_amber_rounded, size: 18),
+                label: Text(
+                  'Missing concepts: ${feedback.breakdown.missingConceptCount}',
+                ),
+              ),
+              Chip(
+                avatar: const Icon(Icons.report_problem_outlined, size: 18),
+                label: Text(
+                  'Misconceptions: ${feedback.breakdown.misconceptionCount}',
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: AppSpacing.lg),
+          const _RubricCard(),
+          const SizedBox(height: AppSpacing.md),
           _FeedbackListCard(
             title: 'Specific feedback',
             items: feedback.specificFeedback,
@@ -1254,7 +1327,9 @@ class _FeedbackPhase extends StatelessWidget {
                       : Icons.refresh_rounded,
                 ),
                 label: Text(
-                  feedback.canPass ? 'Generate note' : 'Retry recall',
+                  feedback.canPass
+                      ? 'Generate corrected note'
+                      : 'Retry recall',
                 ),
               ),
               if (feedback.canPass)
@@ -1264,6 +1339,37 @@ class _FeedbackPhase extends StatelessWidget {
                   label: const Text('Retry anyway'),
                 ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RubricCard extends StatelessWidget {
+  const _RubricCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.paper,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How the score is judged',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'The evaluator looks for the core ideas you mentioned, whether your explanations stay accurate, and whether you included useful supporting detail like key terms, names, dates, examples, and edge cases. Unsupported claims drag the score down.',
           ),
         ],
       ),

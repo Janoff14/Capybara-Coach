@@ -41,6 +41,9 @@ class DashboardScreen extends ConsumerWidget {
     final continueSubtitle = continueSession == null
         ? 'Upload material, pick a chapter or page range, read it, then prove you learned it.'
         : '${continueSession.sourceTitle} - ${continueSession.sectionTitle}';
+    final createSessionPath = allSources.isNotEmpty
+        ? '/session?sourceId=${allSources.first.id}'
+        : '/session';
 
     return Align(
       alignment: Alignment.topCenter,
@@ -88,7 +91,7 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Everything revolves around one loop: upload, read, recall, feedback, retry, note, review.',
+                      'Upload a document. Read one focused section. Hide the text. Retell it from memory. Earn the note.',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Colors.white.withValues(alpha: 0.82),
                       ),
@@ -109,17 +112,14 @@ class DashboardScreen extends ConsumerWidget {
                           return;
                         }
 
-                        if (allSources.isNotEmpty) {
-                          context.go(
-                            '/session?sourceId=${allSources.first.id}',
-                          );
-                          return;
-                        }
-
-                        context.go('/session');
+                        context.go(createSessionPath);
                       },
                       icon: const Icon(Icons.play_arrow_rounded),
-                      label: Text(continueLabel),
+                      label: Text(
+                        continueSession == null
+                            ? 'Continue learning'
+                            : continueLabel,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
@@ -131,6 +131,65 @@ class DashboardScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: AppSpacing.lg),
+              if (isWide)
+                Row(
+                  children: [
+                    Expanded(
+                      child: _WorkflowActionCard(
+                        title: 'Upload document',
+                        description:
+                            'Add a PDF or paste text, let the app split it into chapters or sections, and prepare it for study sessions.',
+                        buttonLabel: 'Open Upload',
+                        icon: Icons.upload_file_outlined,
+                        accent: AppColors.sun,
+                        onPressed: () => context.go('/session'),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: _WorkflowActionCard(
+                        title: 'Create session',
+                        description: allSources.isEmpty
+                            ? 'Upload a document first, then choose the exact section or pages you want to learn today.'
+                            : 'Pick the part you want today, choose assisted or strict mode, and go straight into focused reading.',
+                        buttonLabel: allSources.isEmpty
+                            ? 'Upload First'
+                            : 'Choose Section',
+                        icon: Icons.auto_stories_outlined,
+                        accent: AppColors.mint,
+                        onPressed: () => context.go(createSessionPath),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Column(
+                  children: [
+                    _WorkflowActionCard(
+                      title: 'Upload document',
+                      description:
+                          'Add a PDF or paste text, let the app split it into chapters or sections, and prepare it for study sessions.',
+                      buttonLabel: 'Open Upload',
+                      icon: Icons.upload_file_outlined,
+                      accent: AppColors.sun,
+                      onPressed: () => context.go('/session'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _WorkflowActionCard(
+                      title: 'Create session',
+                      description: allSources.isEmpty
+                          ? 'Upload a document first, then choose the exact section or pages you want to learn today.'
+                          : 'Pick the part you want today, choose assisted or strict mode, and go straight into focused reading.',
+                      buttonLabel: allSources.isEmpty
+                          ? 'Upload First'
+                          : 'Choose Section',
+                      icon: Icons.auto_stories_outlined,
+                      accent: AppColors.mint,
+                      onPressed: () => context.go(createSessionPath),
+                    ),
+                  ],
+                ),
               const SizedBox(height: AppSpacing.lg),
               Wrap(
                 spacing: AppSpacing.md,
@@ -236,6 +295,65 @@ class _MetricCard extends StatelessWidget {
             Text(label),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WorkflowActionCard extends StatelessWidget {
+  const _WorkflowActionCard({
+    required this.title,
+    required this.description,
+    required this.buttonLabel,
+    required this.icon,
+    required this.accent,
+    required this.onPressed,
+  });
+
+  final String title;
+  final String description;
+  final String buttonLabel;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: AppColors.ink),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(description),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton.tonalIcon(
+            onPressed: onPressed,
+            icon: Icon(icon),
+            label: Text(buttonLabel),
+          ),
+        ],
       ),
     );
   }

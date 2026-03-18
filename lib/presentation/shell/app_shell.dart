@@ -92,9 +92,9 @@ class AppShell extends StatelessWidget {
 
     return const [
       _AppDestination(
-        label: 'Capture',
-        path: '/capture',
-        icon: Icons.mic_none_rounded,
+        label: 'Home',
+        path: '/dashboard',
+        icon: Icons.home_outlined,
       ),
       _AppDestination(
         label: 'Review',
@@ -111,8 +111,11 @@ class AppShell extends StatelessWidget {
 
   int _selectedIndex(List<_AppDestination> destinations) {
     final targetPath = switch (location) {
-      final value when value.startsWith('/dashboard') => '/capture',
-      final value when value.startsWith('/session') => '/capture',
+      final value
+          when value.startsWith('/dashboard') ||
+              value.startsWith('/session') ||
+              value.startsWith('/capture') =>
+        '/dashboard',
       final value
           when value.startsWith('/notes') || value.startsWith('/folders') =>
         '/library',

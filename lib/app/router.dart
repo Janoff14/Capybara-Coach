@@ -12,7 +12,7 @@ import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/shell/app_shell.dart';
 
 GoRouter buildRouter(Ref ref) {
-  final initialLocation = kIsWeb ? '/library' : '/capture';
+  final initialLocation = kIsWeb ? '/library' : '/dashboard';
 
   return GoRouter(
     initialLocation: initialLocation,

@@ -192,7 +192,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       clearLastGeneratedNoteId: true,
       clearErrorMessage: true,
       statusMessage:
-          'Read first. When you are ready, the text disappears and you retell it from memory.',
+          'Read first. When you finish, the document disappears and recall starts from memory only.',
     );
   }
 
@@ -212,7 +212,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
     state = state.copyWith(
       activeSession: updated,
       statusMessage:
-          'The reading is hidden now. Explain the key ideas in your own words.',
+          'The reading is hidden now. Explain what you read in your own words as if you were making oral notes.',
     );
   }
 
@@ -238,7 +238,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
         activeSession: updated,
         recallElapsed: Duration.zero,
         statusMessage:
-            'Retell it naturally. Aim for key ideas, details, and edge cases.',
+            'Retell it naturally. Aim for key ideas, correct definitions, terms, examples, and edge cases.',
       );
     } catch (error) {
       _setError('Could not start recall recording.', error);
@@ -265,7 +265,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       state = state.copyWith(
         activeSession: updated,
         pendingRecallAudio: audio,
-        statusMessage: 'Good. Submit this attempt to score your recall.',
+        statusMessage: 'Good. Submit this attempt to score the recall against the document.',
       );
     } catch (error) {
       _setError('Could not finalize recall recording.', error);
@@ -312,7 +312,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       state = state.copyWith(
         activeSession: transcribingSession,
         isWorking: true,
-        statusMessage: 'Turning your voice recall into text...',
+        statusMessage: 'Turning the oral retelling into text...',
         clearErrorMessage: true,
       );
 
@@ -334,7 +334,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       await _learningRepository.upsertSession(evaluatingSession);
       state = state.copyWith(
         activeSession: evaluatingSession,
-        statusMessage: 'Comparing your recall against the source material...',
+        statusMessage: 'Comparing the retelling against the source material...',
       );
 
       final feedback = await _recallEvaluationService.evaluate(
@@ -354,8 +354,8 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
         isWorking: false,
         clearPendingRecallAudio: true,
         statusMessage: feedback.canPass
-            ? 'You passed the recall gate. Turn this into a corrected note.'
-            : 'Retry recommended. You have not captured enough of the source yet.',
+            ? 'You passed the recall gate. Generate the corrected note when ready.'
+            : 'Retry recommended. The recall is still missing too much of the source.',
       );
     } catch (error) {
       _setError('Could not evaluate this recall attempt.', error);
@@ -401,7 +401,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
       state = state.copyWith(
         activeSession: generatingSession,
         isWorking: true,
-        statusMessage: 'Building a corrected study note from your recall...',
+        statusMessage: 'Building a corrected study note from the retelling plus the source...',
       );
 
       final generated = await _sessionNoteSynthesisService.synthesize(
@@ -501,7 +501,7 @@ class SessionFlowController extends StateNotifier<SessionFlowState> {
         activeSession: completeSession,
         isWorking: false,
         lastGeneratedNoteId: finalNote.id,
-        statusMessage: 'Session complete. Your note is saved for review.',
+        statusMessage: 'Session complete. Your corrected note is saved for review.',
       );
     } catch (error) {
       _setError('Could not generate the review note.', error);

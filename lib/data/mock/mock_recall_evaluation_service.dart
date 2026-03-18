@@ -45,6 +45,10 @@ class MockRecallEvaluationService implements RecallEvaluationService {
     final overlap = sourceTerms.where(recallTerms.contains).toList();
     final missing = sourceTerms.where((term) => !recallTerms.contains(term)).toList();
     final introduced = recallTerms.where((term) => !sourceTerms.contains(term)).toList();
+    final terminologySignals = sourceTerms.take(5).toList();
+    final terminologyHits = terminologySignals
+        .where((term) => recallTerms.contains(term))
+        .toList();
 
     final recallScore =
         ((overlap.length / sourceTerms.length.clamp(1, 999)) * 100).round();
@@ -52,10 +56,17 @@ class MockRecallEvaluationService implements RecallEvaluationService {
     final recalledDetails = detailSignals.where(
       (detail) => recallTranscript.toLowerCase().contains(detail.toLowerCase()),
     );
+    final detailCoverageScore =
+        ((recalledDetails.length / detailSignals.length.clamp(1, 999)) * 100)
+            .round();
+    final terminologyScore =
+        ((terminologyHits.length / terminologySignals.length.clamp(1, 999)) * 100)
+            .round();
     final detailScore =
-        ((recalledDetails.length / detailSignals.length.clamp(1, 999)) * 100).round();
-    final accuracyPenalty = (introduced.length * 9).clamp(0, 35);
-    final accuracyScore = (92 - accuracyPenalty).clamp(45, 95);
+        ((detailCoverageScore * 0.55) + (terminologyScore * 0.45)).round();
+    final accuracyPenalty = (introduced.length * 11).clamp(0, 45);
+    final missingPenalty = (missing.take(3).length * 4).clamp(0, 12);
+    final accuracyScore = (96 - accuracyPenalty - missingPenalty).clamp(35, 97);
     final totalScore = ((recallScore * 0.45) +
             (accuracyScore * 0.35) +
             (detailScore * 0.20))
@@ -73,6 +84,8 @@ class MockRecallEvaluationService implements RecallEvaluationService {
       ),
       strengths: [
         if (overlap.isNotEmpty) 'You clearly retained ${overlap.first}.',
+        if (terminologyHits.length >= 2)
+          'You used multiple key terms from the source instead of only broad paraphrase.',
         if (recalledDetails.isNotEmpty)
           'You included useful specifics instead of only broad summary.',
         if (overlap.length >= sourceTerms.length / 2)
@@ -80,17 +93,19 @@ class MockRecallEvaluationService implements RecallEvaluationService {
       ],
       specificFeedback: [
         if (totalScore >= _threshold)
-          'Good pass. Your explanation is usable, but tighten the missing concepts before reviewing later.'
+          'Good pass. The recall is strong enough to earn a corrected note, but the missing concepts still matter for later review.'
         else
-          'You are close, but the recall is still missing too much of the source to lock it in.',
+          'You are below the pass gate because too many core ideas or accurate details were missing from the retelling.',
+        if (accuracyScore < 65)
+          'Definitions or distinctions were shaky, or you introduced claims the source did not support.',
         if (detailScore < 55)
-          'You need more specifics such as examples, edge cases, names, or process steps.'
+          'You need more specifics such as key terms, examples, names, dates, or process steps.'
         else
           'Your level of detail is solid for a first recall attempt.',
       ],
       missingPieces: [
         for (final item in missing.take(4))
-          'You did not mention $item.',
+          'You did not clearly mention $item.',
       ],
       misconceptions: [
         for (final item in introduced.take(3))
@@ -114,11 +129,14 @@ class MockRecallEvaluationService implements RecallEvaluationService {
   }
 
   List<String> _extractDetailSignals(String text) {
-    final sentences = text
-        .split(RegExp(r'(?<=[.!?])\s+'))
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-    return sentences.take(4).toList();
+    final tokens = text
+        .split(RegExp(r'[^A-Za-z0-9]+'))
+        .where((word) => word.length > 6)
+        .map((word) => word.toLowerCase())
+        .where((word) => !_stopWords.contains(word))
+        .toSet()
+        .toList()
+      ..sort();
+    return tokens.take(10).toList();
   }
 }
