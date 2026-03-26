@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -51,6 +52,7 @@ from .study_pipeline import (
 )
 
 settings = get_settings()
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "site"
 app = FastAPI(title=settings.app_name)
 
 app.add_middleware(
@@ -72,6 +74,21 @@ def on_startup() -> None:
 @app.get("/health")
 def healthcheck() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/", include_in_schema=False)
+def website_index() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/styles.css", include_in_schema=False)
+def website_styles() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "styles.css")
+
+
+@app.get("/app.js", include_in_schema=False)
+def website_script() -> FileResponse:
+    return FileResponse(FRONTEND_DIR / "app.js", media_type="application/javascript")
 
 
 @app.post("/audio/upload", response_model=UploadAccepted)

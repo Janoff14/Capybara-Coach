@@ -1,0 +1,77 @@
+﻿{
+    "projectId":  "168069345193552387",
+    "exportedAt":  "2026-03-26T03:58:45.0186804+05:00",
+    "screenCount":  5,
+    "screens":  [
+                    {
+                        "id":  "a0453d165ee54696b6ba749eb72f73d1",
+                        "title":  "Desktop Session Setup",
+                        "deviceType":  "DESKTOP",
+                        "width":  "2560",
+                        "height":  "2152",
+                        "stitchName":  "projects/168069345193552387/screens/a0453d165ee54696b6ba749eb72f73d1",
+                        "screenshotUrl":  "https://lh3.googleusercontent.com/aida/ADBb0uhNdkjIxYCQ12S-mr2nRtZV3tk1zLQ1QSyU8tKg9bKPDhVYLopmiYi-trfiC4xz4PJV1E64bq_e6LvHjSBsDe3Qe5LVwoXDhtVyuja2quD6epCZh1uiG2SHgCTz72QPI6q8ZuNXX9FRIIEqt2FCEXnJeT10QAULq8SDfJUJZl2Ah8SM4a2XZX9zlvjWHJNWKoNqIsCHo7HoRgIhzTqmTAXGXcAk7nVOqL7rFgTtu2bxzHBcyXe3ahNwSg",
+                        "htmlUrl":  "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ6Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpZCiVodG1sXzkyNzk4NGMwZjE5MDQ0NGRiNzE4MmRjOTFlYWVjZjI4EgsSBxDo3tSJ5BoYAZIBIgoKcHJvamVjdF9pZBIUQhIxNjgwNjkzNDUxOTM1NTIzODc\u0026filename=\u0026opi=89354086",
+                        "files":  {
+                                      "screenshot":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\01-desktop-session-setup-a0453d165ee54696b6ba749eb72f73d1\\screenshot.png",
+                                      "html":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\01-desktop-session-setup-a0453d165ee54696b6ba749eb72f73d1\\screen.html"
+                                  }
+                    },
+                    {
+                        "id":  "9bc4d05b70104e8d9dd483d5327058fa",
+                        "title":  "Desktop AI Feedback",
+                        "deviceType":  "DESKTOP",
+                        "width":  "2560",
+                        "height":  "2902",
+                        "stitchName":  "projects/168069345193552387/screens/9bc4d05b70104e8d9dd483d5327058fa",
+                        "screenshotUrl":  "https://lh3.googleusercontent.com/aida/ADBb0ujojf_YfA17Kn1xwQ-cF3UqeNnQ7hQWRq_uOnKqOeofl0qOQsQqZJazl6lw8bGLa9fsqVvtrpQ7GDBVxokAFf2GkV7yZcZsI9D5B4fU9sMZUhnauwvnY6-4lpEriipjYSH-p1RLJR5mflNyHXDhmguV-PHdxFyylmr2fLKdPQKvLYxjUxFkac_UHT88l9dAhnknqzUS7VRwEo7E2uN_ll_K6uJ-ACc8vSlDnG2jm-VPK8vyleSq1yBi0g",
+                        "htmlUrl":  "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ6Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpZCiVodG1sXzg0ZTViOGQyZjdkYzQ0YTg4MDgwMWYwNzI4NjQxZWJkEgsSBxDo3tSJ5BoYAZIBIgoKcHJvamVjdF9pZBIUQhIxNjgwNjkzNDUxOTM1NTIzODc\u0026filename=\u0026opi=89354086",
+                        "files":  {
+                                      "screenshot":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\02-desktop-ai-feedback-9bc4d05b70104e8d9dd483d5327058fa\\screenshot.png",
+                                      "html":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\02-desktop-ai-feedback-9bc4d05b70104e8d9dd483d5327058fa\\screen.html"
+                                  }
+                    },
+                    {
+                        "id":  "deab45b41f084a03966ba4f6ee6e219c",
+                        "title":  "Desktop Recall Phase",
+                        "deviceType":  "DESKTOP",
+                        "width":  "2560",
+                        "height":  "2048",
+                        "stitchName":  "projects/168069345193552387/screens/deab45b41f084a03966ba4f6ee6e219c",
+                        "screenshotUrl":  "https://lh3.googleusercontent.com/aida/ADBb0uhECWOXsN8d7NBG-YBH_kDFbSq0HDOR0RbNVK9ZRg-uoATUDwT4l8MDL72-FVGzEBY13yB1LmN0yObCH7B7oEmzJvDAIz2fP95nLvGeZPnpVwsa6BBqn4HNtGDBUwfa0hKRiNyrrvhrERDoKYyMVVEDeSoudGQvi-HiA0NvMf-jKAzz-ISNn--JMq0poRIoKpGCMJPia4P2WArhbIibruxMgZD0dnOjIfb7U72gyTrL9QzBR6Bh0w0S",
+                        "htmlUrl":  "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ6Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpZCiVodG1sXzYzMTI3NDdkMThkOTQ4YmI5OTk1YWY0YmE4NDcxODNiEgsSBxDo3tSJ5BoYAZIBIgoKcHJvamVjdF9pZBIUQhIxNjgwNjkzNDUxOTM1NTIzODc\u0026filename=\u0026opi=89354086",
+                        "files":  {
+                                      "screenshot":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\03-desktop-recall-phase-deab45b41f084a03966ba4f6ee6e219c\\screenshot.png",
+                                      "html":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\03-desktop-recall-phase-deab45b41f084a03966ba4f6ee6e219c\\screen.html"
+                                  }
+                    },
+                    {
+                        "id":  "5c33ae6ca6b9497394d77183a218a032",
+                        "title":  "Desktop Reading Phase",
+                        "deviceType":  "DESKTOP",
+                        "width":  "2560",
+                        "height":  "3672",
+                        "stitchName":  "projects/168069345193552387/screens/5c33ae6ca6b9497394d77183a218a032",
+                        "screenshotUrl":  "https://lh3.googleusercontent.com/aida/ADBb0uiio8m3lMzMEpm0Dv4ohfPlzzVc7pH54m8WeazTg0wAlmcEhl_Cn_nFDBLtLwCQNumHM5WlKIDcddxxaFVCz4JlDHqUipHHD8KO1G7BrLjcr3MFF15aj8aWe290S0O9l_p90EtZHM9fpBqD163-muOYhNmSkx-gdvrjWqr2HIXpWseuOStsY6sW9lfbw9z5RturTsbaG98VXlydFRLztqcKfgB4JCqUiAHKYysLvSTgJ1-rJJyOip-u",
+                        "htmlUrl":  "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ6Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpZCiVodG1sXzg0ODVmNjgyZTViYTRmNGNiNzA5ODFjMTRiYzUzNmU3EgsSBxDo3tSJ5BoYAZIBIgoKcHJvamVjdF9pZBIUQhIxNjgwNjkzNDUxOTM1NTIzODc\u0026filename=\u0026opi=89354086",
+                        "files":  {
+                                      "screenshot":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\04-desktop-reading-phase-5c33ae6ca6b9497394d77183a218a032\\screenshot.png",
+                                      "html":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\04-desktop-reading-phase-5c33ae6ca6b9497394d77183a218a032\\screen.html"
+                                  }
+                    },
+                    {
+                        "id":  "924ff6426eb54032b572b98dc1548c28",
+                        "title":  "Desktop Generated Note",
+                        "deviceType":  "DESKTOP",
+                        "width":  "2560",
+                        "height":  "2640",
+                        "stitchName":  "projects/168069345193552387/screens/924ff6426eb54032b572b98dc1548c28",
+                        "screenshotUrl":  "https://lh3.googleusercontent.com/aida/ADBb0ujqcT_pSIm0Mvj08mG_4OOdXwYikQK1SPao77_hnvMGJLlPB4uDla2gUdotum5G-0wCSDvqrZA-0Avje5C2vhWSK1Rh9zCCODu8kJ8AaJdwBerFe35jFY5K_XKktiJvE4jpn0aWzZNmA_kn2OxDXm7VY3pXcDAlJDgm8eg7tbbJvpNbCdAHzqh1CbRn5BxMNyPJ2qv2dKRTjfmVo7fhrpOrpP_n25PKjzYQ0Wo3Z8q0i0gFij7yZ7T1Vw",
+                        "htmlUrl":  "https://contribution.usercontent.google.com/download?c=CgthaWRhX2NvZGVmeBJ6Eh1hcHBfY29tcGFuaW9uX2dlbmVyYXRlZF9maWxlcxpZCiVodG1sXzYzZDRmNTllZDc0YzQzNjhiMTRmYzNlYjYyNWEwOGE3EgsSBxDo3tSJ5BoYAZIBIgoKcHJvamVjdF9pZBIUQhIxNjgwNjkzNDUxOTM1NTIzODc\u0026filename=\u0026opi=89354086",
+                        "files":  {
+                                      "screenshot":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\05-desktop-generated-note-924ff6426eb54032b572b98dc1548c28\\screenshot.png",
+                                      "html":  "C:\\Users\\sanja\\Shoki\\docs\\stitch\\document-import\\05-desktop-generated-note-924ff6426eb54032b572b98dc1548c28\\screen.html"
+                                  }
+                    }
+                ]
+}

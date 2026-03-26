@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Recall Session - Capybara Coach</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-fixed-variant": "#324e2a",
+                        "background": "#fcf9f8",
+                        "secondary-container": "#f9ad00",
+                        "surface-container-low": "#f6f3f2",
+                        "on-surface-variant": "#424941",
+                        "surface-variant": "#e5e2e1",
+                        "surface-tint": "#496640",
+                        "secondary-fixed": "#ffdeae",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#ffba3f",
+                        "tertiary-fixed-dim": "#88d982",
+                        "outline": "#727970",
+                        "primary-fixed": "#caecbc",
+                        "primary": "#496640",
+                        "tertiary-fixed": "#a3f69c",
+                        "tertiary-container": "#5ead5c",
+                        "error-container": "#ffdad6",
+                        "on-secondary-container": "#664500",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#1b6d24",
+                        "on-secondary-fixed": "#281800",
+                        "on-tertiary-fixed": "#002204",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#afd0a1",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-tertiary-fixed-variant": "#005312",
+                        "primary-container": "#85a579",
+                        "on-primary-fixed": "#062104",
+                        "on-background": "#1c1b1b",
+                        "surface": "#fcf9f8",
+                        "surface-container": "#f0edec",
+                        "on-surface": "#1c1b1b",
+                        "on-tertiary-container": "#003d0b",
+                        "error": "#ba1a1a",
+                        "outline-variant": "#c2c8be",
+                        "on-primary-container": "#1f3a19",
+                        "inverse-on-surface": "#f3f0ef",
+                        "secondary": "#7f5600",
+                        "surface-container-high": "#ebe7e7",
+                        "inverse-primary": "#afd0a1",
+                        "inverse-surface": "#313030",
+                        "surface-bright": "#fcf9f8",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#dcd9d9",
+                        "on-secondary-fixed-variant": "#604100"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .mic-pulse {
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+    </style>
+</head>
+<body class="bg-background font-body text-on-background antialiased overflow-hidden">
+<!-- Sidebar Navigation Shell -->
+<aside class="h-screen w-64 fixed left-0 top-0 border-r-0 bg-[#f6f3f2] dark:bg-stone-900 flex flex-col py-8 px-4 z-50">
+<div class="mb-12 px-2 flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" data-icon="school">school</span>
+</div>
+<div>
+<h1 class="text-xl font-bold text-[#496640] dark:text-[#85a579] tracking-tight leading-none">Capybara Coach</h1>
+<p class="font-manrope text-[10px] font-semibold tracking-wider uppercase text-on-surface-variant opacity-60 mt-1">Learning Platform</p>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 dark:text-stone-400 font-medium hover:text-[#496640] hover:bg-white/40 dark:hover:bg-white/10 transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-manrope text-sm font-semibold tracking-tight">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-[#496640] dark:text-[#85a579] font-bold border-r-4 border-[#496640] dark:border-[#85a579] bg-white/50 dark:bg-white/5 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="menu_book" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+<span class="font-manrope text-sm font-semibold tracking-tight">Library</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 dark:text-stone-400 font-medium hover:text-[#496640] hover:bg-white/40 dark:hover:bg-white/10 transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-manrope text-sm font-semibold tracking-tight">Profile</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-stone-500 dark:text-stone-400 font-medium hover:text-[#496640] hover:bg-white/40 dark:hover:bg-white/10 transition-colors duration-200 rounded-xl" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-manrope text-sm font-semibold tracking-tight">Settings</span>
+</a>
+</nav>
+<div class="mt-auto">
+<button class="w-full bg-primary text-on-primary py-4 rounded-xl font-headline font-bold text-sm tracking-wide shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="bolt" style="font-variation-settings: 'FILL' 1;">bolt</span>
+                Start Review
+            </button>
+</div>
+</aside>
+<!-- Top Navigation Bar -->
+<header class="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 px-8 z-40 bg-white/80 backdrop-blur-xl flex justify-between items-center shadow-sm shadow-stone-200/50">
+<div class="flex items-center gap-4 bg-surface-container-low px-4 py-2 rounded-full w-96">
+<span class="material-symbols-outlined text-on-surface-variant text-lg" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm font-body w-full" placeholder="Search concepts..." type="text"/>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-stone-500 hover:text-primary transition-all">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="text-stone-500 hover:text-primary transition-all">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+</button>
+<div class="h-8 w-px bg-outline-variant/20 mx-2"></div>
+<button class="bg-primary-container text-on-primary-container px-6 py-2 rounded-full text-sm font-headline font-bold hover:brightness-105 transition-all">
+                New Deck
+            </button>
+<img class="w-10 h-10 rounded-full border-2 border-primary-container" data-alt="User profile avatar looking professional" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlvS1bsfuNg__Y0RrcWEBib6dtQMDqFVAxBrsxVTMhR41Lomvn2aFb-hnR69erF5rACxn0lrwxlN9tnbeNcvs_aYjW0KRC99p9VeMJiuUbLR9dpmVqsFD1enWRkCXF3G4OcyCLEF0eaoTYnhjHZV1-PWp2UkNeTEfwg73AcdgVBe-Tg1ufwLSADI6jfn1MgqMpwCDgLLTwOZnA9eITmJPu6q4lF5bZMUi-4S2ECr38WGjKNtW4-9r_TsorZpvJOBudyFbzvpkMFg"/>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 h-screen flex flex-col relative">
+<!-- Session Progress -->
+<div class="px-12 py-6 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="font-label text-xs font-bold tracking-[0.05em] text-on-surface-variant uppercase">Recall Mode: Active</span>
+<div class="w-32 h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="w-2/3 h-full bg-primary rounded-full"></div>
+</div>
+<span class="font-label text-xs font-bold text-primary">08/12 Concepts</span>
+</div>
+<div class="flex items-center gap-2 text-secondary font-headline font-bold">
+<span class="material-symbols-outlined" data-icon="timer">timer</span>
+<span>02:45</span>
+</div>
+</div>
+<!-- Central Focus Area -->
+<div class="flex-1 grid grid-cols-12 gap-8 px-12 pb-12 overflow-hidden">
+<!-- Left Panel: Concept Checklist (Assisted Mode) -->
+<div class="col-span-3 flex flex-col gap-4">
+<div class="p-6 bg-surface-container-low rounded-xl flex flex-col gap-6">
+<h3 class="font-label text-[10px] font-bold tracking-[0.1em] text-on-surface-variant uppercase">Key Concepts to Cover</h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-tertiary mt-0.5" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium text-on-surface leading-tight">Neural Plasticity Fundamentals</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-tertiary mt-0.5" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-sm font-medium text-on-surface leading-tight">Synaptic Pruning Mechanisms</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline-variant mt-0.5" data-icon="circle">circle</span>
+<span class="text-sm font-medium text-on-surface leading-tight">Long-term Potentiation (LTP)</span>
+</li>
+<li class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline-variant mt-0.5" data-icon="circle">circle</span>
+<span class="text-sm font-medium text-on-surface leading-tight">Hippocampal Role in Memory</span>
+</li>
+</ul>
+</div>
+<div class="mt-auto p-6 bg-secondary-container/10 border border-secondary-container/20 rounded-xl">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="lightbulb" style="font-variation-settings: 'FILL' 1;">lightbulb</span>
+<span class="text-xs font-bold text-secondary-fixed-dim uppercase tracking-tighter">Coach Tip</span>
+</div>
+<p class="text-sm text-on-secondary-container font-body leading-relaxed italic">"Try linking the Hippocampus to your previous lesson on Spatial Awareness."</p>
+</div>
+</div>
+<!-- Center Panel: The Main Interface -->
+<div class="col-span-6 flex flex-col items-center justify-center text-center">
+<div class="max-w-md w-full mb-12">
+<h2 class="font-headline text-3xl font-extrabold text-on-surface mb-4 tracking-tight">Explain what you read in your own words.</h2>
+<p class="text-on-surface-variant/80 font-body text-lg leading-relaxed">The document is hidden to maximize recall. Focus on the core narrative and mechanics.</p>
+</div>
+<!-- Microphone Visualizer -->
+<div class="relative flex items-center justify-center">
+<!-- Pulses -->
+<div class="absolute w-64 h-64 bg-primary/10 rounded-full mic-pulse"></div>
+<div class="absolute w-48 h-48 bg-primary/20 rounded-full mic-pulse" style="animation-delay: 0.5s;"></div>
+<!-- Recording Button -->
+<button class="relative z-10 w-32 h-32 rounded-full bg-gradient-to-br from-primary to-primary-container shadow-2xl shadow-primary/40 flex items-center justify-center transition-transform active:scale-95 group">
+<span class="material-symbols-outlined text-5xl text-on-primary group-hover:scale-110 transition-transform" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+</div>
+<!-- Timer & Status -->
+<div class="mt-12 flex flex-col items-center gap-2">
+<span class="text-3xl font-headline font-extrabold text-primary tracking-tighter">00:42</span>
+<div class="flex items-center gap-2 px-3 py-1 bg-tertiary-container/20 rounded-full">
+<div class="w-1.5 h-1.5 bg-tertiary rounded-full animate-pulse"></div>
+<span class="text-[10px] font-bold text-tertiary uppercase tracking-widest">Listening...</span>
+</div>
+</div>
+<!-- Primary Action Buttons -->
+<div class="mt-16 flex items-center gap-6">
+<button class="px-8 py-4 bg-surface-container-highest text-on-surface font-headline font-bold rounded-xl hover:bg-surface-variant transition-all">
+                        Cancel
+                    </button>
+<button class="px-10 py-4 bg-primary text-on-primary font-headline font-bold rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        Finish Recording
+                    </button>
+</div>
+</div>
+<!-- Right Panel: Audio Visualizer & Metadata -->
+<div class="col-span-3 flex flex-col gap-6">
+<div class="flex-1 bg-surface-container-low rounded-xl p-6 flex flex-col gap-4">
+<h3 class="font-label text-[10px] font-bold tracking-[0.1em] text-on-surface-variant uppercase">Waveform Analysis</h3>
+<div class="flex-1 flex items-center justify-center gap-1">
+<div class="w-1.5 h-8 bg-primary rounded-full opacity-40"></div>
+<div class="w-1.5 h-12 bg-primary rounded-full opacity-60"></div>
+<div class="w-1.5 h-20 bg-primary rounded-full"></div>
+<div class="w-1.5 h-16 bg-primary rounded-full opacity-80"></div>
+<div class="w-1.5 h-24 bg-primary rounded-full"></div>
+<div class="w-1.5 h-14 bg-primary rounded-full opacity-70"></div>
+<div class="w-1.5 h-10 bg-primary rounded-full opacity-50"></div>
+<div class="w-1.5 h-6 bg-primary rounded-full opacity-30"></div>
+</div>
+<div class="p-4 bg-white/50 rounded-lg">
+<p class="text-xs font-semibold text-on-surface-variant leading-relaxed">
+<span class="text-primary">Transcription Live:</span> "Essentially, synaptic pruning is the process by which the brain removes extra synapses..."
+                        </p>
+</div>
+</div>
+<div class="p-6 bg-white border border-outline-variant/10 rounded-xl shadow-sm">
+<div class="flex items-center justify-between mb-4">
+<span class="font-label text-[10px] font-bold tracking-[0.1em] text-on-surface-variant uppercase">Current Deck</span>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="info">info</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="Microscopic view of neurons and brain activity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBj6FnGrBdqT2dBQ8lYK4-NAYZ4EqvG8FJ-Z_tay5vvF-j64FUv_GOQ942G4cy7b70UusfTVby-Zrq9I-d4fwBA_W0RtVoul21TRaGnwEoneNkvgfNUS8iyiRVL1H9UkffZCNQljeCuEmNAUceQdOES9UsBXWfsxYTE8d7lOVO8XuV5CRiSelZwe__VJLCSxJh5Eh2K67twvHkrLZ9pYozdPqsuOPa_t_PjAkrrNZ_uNJ7IfNz8k1z-w_0SfJg7tptUUcDSVn-6mg"/>
+</div>
+<div class="overflow-hidden">
+<h4 class="text-sm font-bold text-on-surface truncate">Advanced Neuroscience</h4>
+<p class="text-[10px] font-medium text-on-surface-variant">Last activity: 2h ago</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Hidden Document Indicator (Subtle background texture) -->
+<div class="absolute inset-0 pointer-events-none z-[-1] opacity-5 flex items-center justify-center overflow-hidden">
+<div class="grid grid-cols-4 gap-4 w-[120%] h-[120%] rotate-12">
+<div class="bg-primary-container/20 rounded-3xl h-96"></div>
+<div class="bg-primary/20 rounded-3xl h-96 mt-24"></div>
+<div class="bg-primary-container/20 rounded-3xl h-96 -mt-12"></div>
+<div class="bg-primary/20 rounded-3xl h-96 mt-32"></div>
+</div>
+</div>
+</main>
+</body></html>

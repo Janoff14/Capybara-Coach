@@ -8,15 +8,23 @@ import '../presentation/screens/library/library_screen.dart';
 import '../presentation/screens/notes/note_detail_screen.dart';
 import '../presentation/screens/session/session_screen.dart';
 import '../presentation/screens/settings/settings_screen.dart';
+import '../presentation/screens/web/workflow_studio_screen.dart';
 import '../presentation/shell/app_shell.dart';
 
 GoRouter buildRouter(Ref ref) {
-  final initialLocation = kIsWeb ? '/library' : '/dashboard';
+  final initialLocation = kIsWeb ? '/studio' : '/dashboard';
 
   return GoRouter(
     initialLocation: initialLocation,
     routes: [
       GoRoute(path: '/', redirect: (context, state) => initialLocation),
+      if (kIsWeb)
+        GoRoute(
+          path: '/studio',
+          pageBuilder: (context, state) => const NoTransitionPage<void>(
+            child: WorkflowStudioScreen(),
+          ),
+        ),
       ShellRoute(
         builder: (context, state, child) {
           return AppShell(location: state.matchedLocation, child: child);

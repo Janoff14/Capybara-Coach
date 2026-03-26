@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-primary-fixed-variant": "#324e2a",
+              "background": "#fcf9f8",
+              "secondary-container": "#f9ad00",
+              "surface-container-low": "#f6f3f2",
+              "on-surface-variant": "#424941",
+              "surface-variant": "#e5e2e1",
+              "surface-tint": "#496640",
+              "secondary-fixed": "#ffdeae",
+              "on-error-container": "#93000a",
+              "secondary-fixed-dim": "#ffba3f",
+              "tertiary-fixed-dim": "#88d982",
+              "outline": "#727970",
+              "primary-fixed": "#caecbc",
+              "primary": "#496640",
+              "tertiary-fixed": "#a3f69c",
+              "tertiary-container": "#5ead5c",
+              "error-container": "#ffdad6",
+              "on-secondary-container": "#664500",
+              "on-secondary": "#ffffff",
+              "surface-container-lowest": "#ffffff",
+              "tertiary": "#1b6d24",
+              "on-secondary-fixed": "#281800",
+              "on-tertiary-fixed": "#002204",
+              "on-primary": "#ffffff",
+              "primary-fixed-dim": "#afd0a1",
+              "surface-container-highest": "#e5e2e1",
+              "on-tertiary-fixed-variant": "#005312",
+              "primary-container": "#85a579",
+              "on-primary-fixed": "#062104",
+              "on-background": "#1c1b1b",
+              "surface": "#fcf9f8",
+              "surface-container-high": "#ebe7e7",
+              "on-surface": "#1c1b1b",
+              "on-tertiary-container": "#003d0b",
+              "error": "#ba1a1a",
+              "outline-variant": "#c2c8be",
+              "on-primary-container": "#1f3a19",
+              "inverse-on-surface": "#f3f0ef",
+              "secondary": "#7f5600",
+              "surface-container": "#f0edec",
+              "inverse-primary": "#afd0a1",
+              "inverse-surface": "#313030",
+              "surface-bright": "#fcf9f8",
+              "on-tertiary": "#ffffff",
+              "on-error": "#ffffff",
+              "surface-dim": "#dcd9d9",
+              "on-secondary-fixed-variant": "#604100"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen">
+<!-- Top Navigation Shell (Suppressing SideNav for Focus Mode) -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-stone-950/80 backdrop-blur-xl shadow-sm shadow-stone-200/50 flex justify-between items-center h-16 px-8">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+<span class="font-label text-sm font-semibold tracking-tight">EXIT SESSION</span>
+</button>
+<div class="h-6 w-[1px] bg-outline-variant/30"></div>
+<div class="flex flex-col">
+<span class="font-label text-[10px] text-on-surface-variant tracking-[0.1em] font-bold">CURRENT DECK</span>
+<span class="font-headline text-sm font-bold text-primary">Strategic Management Principles</span>
+</div>
+</div>
+<!-- Progress Tracker Center -->
+<div class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 w-full max-w-xs">
+<div class="flex justify-between w-full font-label text-[10px] text-on-surface-variant font-bold tracking-wider">
+<span>READING PROGRESS</span>
+<span>65%</span>
+</div>
+<div class="w-full h-2 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full" style="width: 65%"></div>
+</div>
+</div>
+<!-- Reading Stats Right -->
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded-xl">
+<span class="material-symbols-outlined text-secondary" data-icon="timer">timer</span>
+<span class="font-headline font-bold text-sm tabular-nums">12:45</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-surface-container-low rounded-lg transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
+<img alt="Capybara Coach User" class="w-full h-full object-cover rounded-full" data-alt="Close up portrait of a capybara coach" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsOUuLthOp0kvZ1dTOEoSFt51iOTiRw-sNX39EP1IAjunEhTspwvhM1qZCe10sj0MEr0r6jNn4H0SuUntP3UM7Ks86_gyxKHLg5F5diWzphgOOD0lsOe-ZgSUtlCNRWgvX8mHTPmzxTOjzeCD_TmyD_1QRW3br_wPfIs15e1EAcYpkUGrC3YjSsyiCeAKlt9UJhXciRDO5_QDCmqLFDG-jUw0ooeX-PFshSrgyMvr5mJifcwoVvbm9_79LRjQDskS6VqOa8OHYRw"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-24 pb-32 flex justify-center">
+<article class="w-full max-w-3xl px-8 md:px-0">
+<!-- Hero Image / Header -->
+<div class="mb-12 rounded-xl overflow-hidden aspect-[21/9] relative group">
+<img alt="Reading Atmosphere" class="w-full h-full object-cover grayscale opacity-80" data-alt="A focused studying environment with books and coffee" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBakJQXQ6AQqTA_6fg12vwGgUcGF6rZ794i1JOIkeZ1WJ6rNqFovI1H24VgMt83pTiSYWTRRIephZWc-uLzq2nc5Z1-1EGZ0S1YuQC_gIbOk8a_gAzZnu7a0_GW4FT2G6aiJDcIdDLgS4qkjG2aR5B3Tz4SVZUVLa_rDB5LK-8rwtzU2UL1VgemC4ZiPztj3VaWQjI_VUrJrdcpiTDE7XUXuR6mRBvqVpxLRI3QR1ckj0jBRuAHZ4do_QbTRUh4KVcE1AfSUAkvKg"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent"></div>
+<div class="absolute bottom-6 left-6">
+<h1 class="font-headline text-4xl font-extrabold tracking-tight text-on-surface">The Essence of Porter’s Five Forces</h1>
+<p class="font-body text-on-surface-variant mt-2">Section 3: Competitive Rivalry and Strategic Positioning</p>
+</div>
+</div>
+<!-- Content Body -->
+<div class="space-y-8 font-body text-lg leading-relaxed text-on-surface/90">
+<p>
+                    Strategic positioning is not about being the best; it is about being unique. Michael Porter argued that the essence of strategy lies in choosing to perform activities differently than rivals do. Without a clear strategic direction, a firm risks becoming "stuck in the middle," lacking a distinct competitive advantage.
+                </p>
+<p>
+                    The first force, <strong class="text-primary">Competitive Rivalry</strong>, measures the intensity of competition in an industry. High rivalry often leads to price wars, increased advertising costs, and aggressive service improvements, all of which can erode overall industry profitability.
+                </p>
+<!-- Reflection Prompt Box (Integrated) -->
+<section class="my-12 p-8 rounded-xl bg-surface-container-low border-l-4 border-primary/40 relative overflow-hidden">
+<div class="absolute top-0 right-0 p-4 opacity-10">
+<span class="material-symbols-outlined text-6xl" data-icon="lightbulb">lightbulb</span>
+</div>
+<div class="relative z-10">
+<span class="font-label text-[11px] font-bold text-primary tracking-widest uppercase mb-3 block">Reflection Prompt</span>
+<h3 class="font-headline text-xl font-bold mb-4">How does your current organization differentiate itself from its closest three rivals?</h3>
+<div class="relative">
+<textarea class="w-full bg-surface-container-lowest border-none focus:ring-2 focus:ring-primary/20 rounded-lg p-4 font-body text-base placeholder:text-outline-variant min-h-[120px]" placeholder="Type your thoughts here to solidify your learning..."></textarea>
+<div class="absolute bottom-3 right-3 flex items-center gap-2 text-on-surface-variant/40">
+<span class="text-xs font-label">AUTO-SAVING</span>
+<span class="material-symbols-outlined text-xs" data-icon="check_circle">check_circle</span>
+</div>
+</div>
+</div>
+</section>
+<p>
+                    When analyzing the <strong class="text-primary">Bargaining Power of Suppliers</strong>, one must consider the concentration of suppliers and the availability of substitute inputs. If a supplier has a monopoly or near-monopoly on a critical component, they can exert significant pressure on industry margins.
+                </p>
+<p>
+                    Conversely, the <strong class="text-primary">Bargaining Power of Buyers</strong> increases when products are undifferentiated or when switching costs are low. In the digital age, transparency and price comparison tools have significantly empowered consumers, forcing companies to find new ways to create value beyond mere cost-leadership.
+                </p>
+<!-- Subtle Quote Component -->
+<blockquote class="my-10 border-l-2 border-outline-variant pl-8 italic text-on-surface-variant text-xl">
+                    "The company without a strategy is willing to try anything. If all you’re trying to do is the same thing as your neighbors, it’s unlikely you’re going to be very successful."
+                </blockquote>
+<p>
+                    Finally, the threat of new entrants and the threat of substitutes complete the framework. A robust strategy anticipates these shifts by building moats—whether through brand loyalty, proprietary technology, or economies of scale.
+                </p>
+</div>
+<!-- Author / Source Footer -->
+<footer class="mt-16 pt-8 border-t border-surface-container-high flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" data-icon="book">book</span>
+</div>
+<div>
+<p class="font-headline font-bold text-sm">Source: HBR Classic Selections</p>
+<p class="font-label text-xs text-on-surface-variant">Last reviewed 2 days ago</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="p-2 hover:bg-surface-container-low rounded-lg transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+<button class="p-2 hover:bg-surface-container-low rounded-lg transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="bookmark">bookmark</span>
+</button>
+</div>
+</footer>
+</article>
+</main>
+<!-- Fixed Action Bar -->
+<div class="fixed bottom-8 right-8 flex items-center gap-4">
+<!-- Optional Floating Secondary Action -->
+<button class="flex items-center justify-center w-14 h-14 rounded-full bg-surface-container-lowest shadow-lg shadow-on-surface/5 text-on-surface-variant hover:text-primary transition-all active:scale-95 group">
+<span class="material-symbols-outlined transition-transform group-hover:-translate-y-0.5" data-icon="vertical_align_top">vertical_align_top</span>
+</button>
+<!-- Primary Finish Reading Button -->
+<button class="flex items-center gap-3 bg-gradient-to-br from-primary to-primary-container text-on-primary px-8 py-4 rounded-full font-headline font-bold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-98 transition-all">
+<span>I'm Ready</span>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<!-- Layout Decorations (Organic feel) -->
+<div class="fixed top-32 left-8 w-64 hidden lg:block space-y-6 opacity-40 hover:opacity-100 transition-opacity">
+<div class="space-y-1">
+<span class="font-label text-[10px] font-bold tracking-[0.2em] text-on-surface-variant">ON THIS PAGE</span>
+<ul class="space-y-3 mt-4">
+<li class="flex items-center gap-2 text-primary font-bold text-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+                    Strategic Positioning
+                </li>
+<li class="flex items-center gap-2 text-on-surface-variant font-medium text-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest"></span>
+                    Competitive Rivalry
+                </li>
+<li class="flex items-center gap-2 text-on-surface-variant font-medium text-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest"></span>
+                    Bargaining Power
+                </li>
+<li class="flex items-center gap-2 text-on-surface-variant font-medium text-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-surface-container-highest"></span>
+                    Moats &amp; Entrants
+                </li>
+</ul>
+</div>
+</div>
+</body></html>
