@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,9 +12,20 @@ from app.models.user import User
 from app.schemas.document import DocumentRead
 from app.services.auth import get_current_user
 from app.services.pdf import extract_text_from_payload
-from app.services.storage import build_object_path, sanitize_filename, upload_bytes
+from app.services.storage import build_object_path, download_bytes, sanitize_filename, upload_bytes
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+
+def _get_document_or_404(db: Session, document_id: str, user_id: str) -> Document:
+    statement = select(Document).where(
+        Document.id == document_id,
+        Document.user_id == user_id,
+    )
+    document = db.scalars(statement).one_or_none()
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return document
 
 
 @router.get("", response_model=list[DocumentRead])
@@ -36,14 +47,34 @@ def get_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Document:
-    statement = select(Document).where(
-        Document.id == document_id,
-        Document.user_id == current_user.id,
+    return _get_document_or_404(db, document_id, current_user.id)
+
+
+@router.get("/{document_id}/file")
+def get_document_file(
+    document_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    document = _get_document_or_404(db, document_id, current_user.id)
+    try:
+        payload = download_bytes(
+            settings=settings,
+            bucket=document.storage_bucket,
+            object_path=document.storage_path,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    filename = sanitize_filename(document.original_filename or f"{document.id}.pdf")
+    return Response(
+        content=payload,
+        media_type=document.content_type or "application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"',
+        },
     )
-    document = db.scalars(statement).one_or_none()
-    if document is None:
-        raise HTTPException(status_code=404, detail="Document not found.")
-    return document
 
 
 @router.post("/upload", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)

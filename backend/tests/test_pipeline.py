@@ -111,6 +111,7 @@ class PipelineApiTests(unittest.TestCase):
 
         with (
             patch("app.api.routes.documents.upload_bytes", side_effect=self._fake_upload),
+            patch("app.api.routes.documents.download_bytes", side_effect=self._fake_download),
             patch("app.api.routes.sessions.upload_bytes", side_effect=self._fake_upload),
             patch("app.api.routes.sessions.download_bytes", side_effect=self._fake_download),
             patch(
@@ -155,6 +156,14 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(document_response.status_code, 201)
             document = document_response.json()
             self.assertIn("Newton's first law", document["extracted_text"])
+
+            document_file_response = self.client.get(
+                f"/documents/{document['id']}/file",
+                headers=headers,
+            )
+            self.assertEqual(document_file_response.status_code, 200)
+            self.assertEqual(document_file_response.headers["content-type"], "application/pdf")
+            self.assertTrue(document_file_response.content.startswith(b"%PDF-1.4"))
 
             session_response = self.client.post(
                 "/sessions",
