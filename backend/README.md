@@ -1,69 +1,93 @@
 # Capybara Coach Backend
 
-Minimal FastAPI prototype for the core voice-note loop:
+Clean FastAPI backend for the minimum demo pipeline:
 
-1. Upload audio
-2. Transcribe with `faster-whisper` locally or a cloud STT fallback on deploy
-3. Generate a structured note with one LLM API
-4. Save note, tags, and folder suggestion
-5. Fetch the finished note back from the API
+1. Upload a PDF document
+2. Extract and store its text
+3. Create a study session
+4. Upload session audio
+5. Transcribe with Azure OpenAI STT
+6. Assess the explanation against the source
+7. Generate clean notes
 
-## Local run
+## Project shape
 
-Fastest path on PowerShell:
+```text
+app/
+  main.py
+  core/
+  models/
+  schemas/
+  api/
+  services/
+```
+
+## Local setup
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_local.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
 ```
 
-Manual path:
+Copy `.env.example` to `.env` and fill in:
 
-1. Create a virtual environment.
-2. Install dependencies:
+- `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+- `AZURE_OPENAI_ENDPOINT`
+- `AZURE_OPENAI_API_KEY`
+- `AZURE_OPENAI_STT_DEPLOYMENT`
+- `AZURE_OPENAI_TEXT_DEPLOYMENT`
 
-```bash
-pip install -r requirements.txt
-```
+If you still have the old prototype SQLite file around, delete `capybara_coach.db` once before running this rebuild.
 
-3. Copy `.env.example` to `.env` and fill in `DATABASE_URL`. Add `LLM_API_KEY` and `LLM_MODEL` if you want live note generation instead of the heuristic fallback.
-   Local-first default:
-   - keep `DATABASE_URL=sqlite:///./capybara_coach.db`
-   Railway deploy:
-   - replace it with Railway Postgres `DATABASE_URL`
-   STT recommendation:
-   - local dev: keep `STT_PROVIDER=auto` to prefer local `faster-whisper`
-   - Railway deploy: use `STT_PROVIDER=openai` so transcription does not depend on local model binaries in the container
-4. Start the API:
+## Main endpoints
 
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+- `POST /documents/upload`
+- `POST /sessions`
+- `POST /sessions/{id}/audio`
+- `POST /sessions/{id}/transcribe`
+- `POST /sessions/{id}/assess`
+- `POST /sessions/{id}/notes`
+- `GET /sessions/{id}`
 
-Smoke test after the server starts:
+## Smoke checks
+
+Azure STT:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke_test.ps1
+.\.venv\Scripts\python.exe .\test_stt.py
+```
+
+Azure evaluator:
+
+```powershell
+.\.venv\Scripts\python.exe .\test_llm.py
+```
+
+Full local pipeline:
+
+```powershell
+.\.venv\Scripts\python.exe .\scripts\smoke_pipeline.py
 ```
 
 ## Railway
 
-- Create a Railway service from the `backend/` folder.
-- Attach a Postgres database.
-- Add a volume and set `STORAGE_DIR=/data`.
-- Set `DATABASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`.
-- For Railway, also set:
-  - `STT_PROVIDER=openai`
-  - `STT_BASE_URL=https://api.openai.com/v1`
-  - `STT_MODEL=gpt-4o-mini-transcribe`
-  - `STT_API_KEY` only if you want a separate key; otherwise it will reuse `LLM_API_KEY`
-- Railway can build from the included `Dockerfile`.
+Deploy with:
 
-## Core endpoints
+```powershell
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
 
-- `POST /audio/upload`
-- `POST /transcribe/{upload_id}`
-- `POST /notes/generate/{note_id}`
-- `GET /notes/{note_id}`
-- `GET /notes`
-- `GET /folders`
+Required env vars:
+
+- `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_DOCUMENTS_BUCKET=documents`
+- `SUPABASE_AUDIO_BUCKET=audio`
+- `AZURE_OPENAI_ENDPOINT`
+- `AZURE_OPENAI_API_KEY`
+- `AZURE_OPENAI_API_VERSION=2024-02-01`
+- `AZURE_OPENAI_STT_DEPLOYMENT=gpt-4o-mini-transcribe`
+- `AZURE_OPENAI_TEXT_DEPLOYMENT=gpt-4.1-mini`

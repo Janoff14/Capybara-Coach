@@ -1,0 +1,166 @@
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+_TEMP_DIR = Path(tempfile.mkdtemp(prefix="capybara-coach-tests-")).resolve()
+os.environ["DATABASE_URL"] = f"sqlite:///{(_TEMP_DIR / 'pipeline.db').as_posix()}"
+os.environ["SUPABASE_URL"] = "https://example.supabase.co"
+os.environ["SUPABASE_KEY"] = "test-key"
+os.environ["AZURE_OPENAI_ENDPOINT"] = "https://example.cognitiveservices.azure.com"
+os.environ["AZURE_OPENAI_API_KEY"] = "test-key"
+
+from fastapi.testclient import TestClient
+
+from app.core.database import Base, engine
+from app.main import app
+
+
+def build_pdf_bytes(text: str) -> bytes:
+    escaped_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    stream = f"BT\n/F1 12 Tf\n72 720 Td\n({escaped_text}) Tj\nET\n"
+    objects = [
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        (
+            "3 0 obj\n"
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            "/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\n"
+            "endobj\n"
+        ),
+        (
+            f"4 0 obj\n<< /Length {len(stream.encode('latin-1'))} >>\nstream\n"
+            f"{stream}endstream\nendobj\n"
+        ),
+        "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    ]
+
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(pdf))
+        pdf.extend(obj.encode("latin-1"))
+
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("latin-1"))
+
+    trailer = (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n"
+    )
+    pdf.extend(trailer.encode("latin-1"))
+    return bytes(pdf)
+
+
+class PipelineApiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.client.close()
+        Base.metadata.drop_all(bind=engine)
+
+    def setUp(self) -> None:
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        self.storage: dict[tuple[str, str], bytes] = {}
+
+    def _fake_upload(self, *, bucket: str, object_path: str, payload: bytes, **_: object) -> str:
+        self.storage[(bucket, object_path)] = payload
+        return object_path
+
+    def _fake_download(self, *, bucket: str, object_path: str, **_: object) -> bytes:
+        return self.storage[(bucket, object_path)]
+
+    def test_full_pipeline(self) -> None:
+        pdf_bytes = build_pdf_bytes(
+            "Newton's first law says an object stays at rest or moves uniformly unless acted on by a force."
+        )
+
+        with (
+            patch("app.api.routes.documents.upload_bytes", side_effect=self._fake_upload),
+            patch("app.api.routes.sessions.upload_bytes", side_effect=self._fake_upload),
+            patch("app.api.routes.sessions.download_bytes", side_effect=self._fake_download),
+            patch(
+                "app.api.routes.sessions.transcribe_audio",
+                return_value={
+                    "text": "An object keeps its state of motion unless a force changes it.",
+                    "provider": "gpt-4o-mini-transcribe",
+                    "language": "en",
+                },
+            ),
+            patch(
+                "app.api.routes.sessions.assess_transcript",
+                return_value={
+                    "score": 91,
+                    "accuracy": 92,
+                    "coverage": 90,
+                    "clarity": 89,
+                    "examples": 80,
+                    "feedback": "Accurate explanation with clear wording.",
+                    "strengths": ["Defines inertia well"],
+                    "gaps": ["Could add a concrete example"],
+                },
+            ),
+            patch(
+                "app.api.routes.sessions.generate_notes",
+                return_value={
+                    "title": "Newton's First Law",
+                    "summary": "A short clean summary of inertia.",
+                    "content": "Objects resist changes to their motion unless a net force acts.",
+                },
+            ),
+        ):
+            document_response = self.client.post(
+                "/documents/upload",
+                files={"file": ("physics.pdf", pdf_bytes, "application/pdf")},
+            )
+            self.assertEqual(document_response.status_code, 201)
+            document = document_response.json()
+            self.assertIn("Newton's first law", document["extracted_text"])
+
+            session_response = self.client.post(
+                "/sessions",
+                json={"document_id": document["id"]},
+            )
+            self.assertEqual(session_response.status_code, 201)
+            study_session = session_response.json()
+            self.assertEqual(study_session["status"], "created")
+
+            audio_response = self.client.post(
+                f"/sessions/{study_session['id']}/audio",
+                files={"file": ("speech.wav", b"fake-audio", "audio/wav")},
+            )
+            self.assertEqual(audio_response.status_code, 200)
+            self.assertEqual(audio_response.json()["status"], "audio_uploaded")
+
+            transcribe_response = self.client.post(f"/sessions/{study_session['id']}/transcribe")
+            self.assertEqual(transcribe_response.status_code, 200)
+            self.assertIn("force changes it", transcribe_response.json()["transcript_text"])
+
+            assess_response = self.client.post(f"/sessions/{study_session['id']}/assess")
+            self.assertEqual(assess_response.status_code, 200)
+            self.assertEqual(assess_response.json()["assessment_score"], 91)
+
+            notes_response = self.client.post(f"/sessions/{study_session['id']}/notes")
+            self.assertEqual(notes_response.status_code, 200)
+            final_session = notes_response.json()
+            self.assertEqual(final_session["status"], "notes_ready")
+            self.assertEqual(final_session["note"]["title"], "Newton's First Law")
+            self.assertIn("Objects resist changes", final_session["note"]["content"])
+
+            fetch_response = self.client.get(f"/sessions/{study_session['id']}")
+            self.assertEqual(fetch_response.status_code, 200)
+            self.assertEqual(fetch_response.json()["assessment_feedback"], "Accurate explanation with clear wording.")
+
+
+if __name__ == "__main__":
+    unittest.main()

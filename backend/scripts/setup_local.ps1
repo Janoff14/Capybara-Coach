@@ -26,5 +26,5 @@ if (-not (Test-Path $envPath)) {
 
 Write-Host ""
 Write-Host "Local backend setup is ready."
-Write-Host "Edit backend/.env if you want to add LLM_API_KEY and LLM_MODEL."
+Write-Host "Edit backend/.env with your Supabase and Azure OpenAI settings."
 Write-Host "Then run .\scripts\run_local.ps1"

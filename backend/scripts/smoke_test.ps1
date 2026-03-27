@@ -1,12 +1,16 @@
 $ErrorActionPreference = "Stop"
 
-$baseUrl = "http://127.0.0.1:8000"
+$root = Split-Path -Parent $PSScriptRoot
+$pythonPath = Join-Path $root ".venv\Scripts\python.exe"
 
-Write-Host "Checking health endpoint..."
-$health = Invoke-RestMethod -Uri "$baseUrl/health"
-$health | ConvertTo-Json
+if (-not (Test-Path $pythonPath)) {
+    throw "Virtual environment is missing. Run .\scripts\setup_local.ps1 first."
+}
 
-Write-Host ""
-Write-Host "Listing demo notes..."
-$notes = Invoke-RestMethod -Uri "$baseUrl/notes"
-$notes | ConvertTo-Json -Depth 5
+Push-Location $root
+try {
+    & $pythonPath .\scripts\smoke_pipeline.py
+}
+finally {
+    Pop-Location
+}
