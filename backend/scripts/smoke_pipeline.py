@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
@@ -77,8 +78,28 @@ def main() -> None:
     )
 
     with TestClient(app) as client:
+        email = f"smoke-{uuid4().hex}@example.com"
+        password = "smoke-password"
+        register_response = client.post(
+            "/auth/register",
+            json={
+                "email": email,
+                "password": password,
+                "display_name": "Smoke Tester",
+            },
+        )
+        register_response.raise_for_status()
+        login_response = client.post(
+            "/auth/login",
+            json={"email": email, "password": password},
+        )
+        login_response.raise_for_status()
+        token = login_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
         document_response = client.post(
             "/documents/upload",
+            headers=headers,
             files={"file": ("physics.pdf", pdf_bytes, "application/pdf")},
         )
         document_response.raise_for_status()
@@ -86,33 +107,55 @@ def main() -> None:
 
         session_response = client.post(
             "/sessions",
+            headers=headers,
             json={"document_id": document["id"]},
         )
         session_response.raise_for_status()
         study_session = session_response.json()
 
+        finish_response = client.post(
+            f"/sessions/{study_session['id']}/finish-reading",
+            headers=headers,
+        )
+        finish_response.raise_for_status()
+
         with audio_path.open("rb") as audio_file:
             audio_response = client.post(
                 f"/sessions/{study_session['id']}/audio",
+                headers=headers,
                 files={"file": (audio_path.name, audio_file.read(), "audio/wav")},
             )
         audio_response.raise_for_status()
 
-        transcribe_response = client.post(f"/sessions/{study_session['id']}/transcribe")
+        transcribe_response = client.post(
+            f"/sessions/{study_session['id']}/transcribe",
+            headers=headers,
+        )
         transcribe_response.raise_for_status()
 
-        assess_response = client.post(f"/sessions/{study_session['id']}/assess")
+        assess_response = client.post(
+            f"/sessions/{study_session['id']}/assess",
+            headers=headers,
+        )
         assess_response.raise_for_status()
 
-        notes_response = client.post(f"/sessions/{study_session['id']}/notes")
+        notes_response = client.post(
+            f"/sessions/{study_session['id']}/notes",
+            headers=headers,
+        )
         notes_response.raise_for_status()
         final_session = notes_response.json()
+
+        notes_response = client.get("/notes", headers=headers)
+        notes_response.raise_for_status()
+        notes = notes_response.json()
 
     print("Document uploaded:", document["id"])
     print("Session created:", study_session["id"])
     print("Transcript:", final_session["transcript_text"])
     print("Score:", final_session["assessment_score"])
     print("Note title:", final_session["note"]["title"] if final_session["note"] else "missing")
+    print("Notes count:", len(notes))
 
 
 if __name__ == "__main__":

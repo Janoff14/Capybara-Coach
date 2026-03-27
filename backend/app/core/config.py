@@ -10,8 +10,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "sqlite:///./capybara_coach.db"
     storage_dir: Path = Path("./storage")
-    default_user_email: str = "student@capybaracoach.local"
-    default_user_name: str = "Demo Student"
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7
 
     supabase_url: str | None = None
     supabase_key: str | None = Field(

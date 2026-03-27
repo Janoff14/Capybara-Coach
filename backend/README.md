@@ -32,6 +32,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
 Copy `.env.example` to `.env` and fill in:
 
 - `DATABASE_URL`
+- `JWT_SECRET_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
 - `AZURE_OPENAI_ENDPOINT`
@@ -43,8 +44,14 @@ If you still have the old prototype SQLite file around, delete `capybara_coach.d
 
 ## Main endpoints
 
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me`
+- `GET /documents`
 - `POST /documents/upload`
+- `GET /notes`
 - `POST /sessions`
+- `POST /sessions/{id}/finish-reading`
 - `POST /sessions/{id}/audio`
 - `POST /sessions/{id}/transcribe`
 - `POST /sessions/{id}/assess`
@@ -82,6 +89,7 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 Required env vars:
 
 - `DATABASE_URL`
+- `JWT_SECRET_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_DOCUMENTS_BUCKET=documents`

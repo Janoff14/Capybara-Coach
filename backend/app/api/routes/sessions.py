@@ -7,10 +7,11 @@ from app.core.database import get_db
 from app.models.document import Document
 from app.models.note import Note
 from app.models.study_session import StudySession
+from app.models.user import User
 from app.schemas.session import SessionCreate, StudySessionRead
 from app.services.ai import assess_transcript, generate_notes, transcribe_audio
+from app.services.auth import get_current_user
 from app.services.storage import build_object_path, download_bytes, sanitize_filename, upload_bytes
-from app.services.users import get_or_create_default_user
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -22,8 +23,11 @@ def _session_query():
     )
 
 
-def _get_session_or_404(db: Session, session_id: str) -> StudySession:
-    statement = _session_query().where(StudySession.id == session_id)
+def _get_session_or_404(db: Session, session_id: str, user_id: str) -> StudySession:
+    statement = _session_query().where(
+        StudySession.id == session_id,
+        StudySession.user_id == user_id,
+    )
     study_session = db.scalars(statement).unique().one_or_none()
     if study_session is None:
         raise HTTPException(status_code=404, detail="Study session not found.")
@@ -31,35 +35,62 @@ def _get_session_or_404(db: Session, session_id: str) -> StudySession:
 
 
 @router.get("", response_model=list[StudySessionRead])
-def list_sessions(db: Session = Depends(get_db)) -> list[StudySession]:
-    statement = _session_query().order_by(StudySession.created_at.desc())
+def list_sessions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[StudySession]:
+    statement = (
+        _session_query()
+        .where(StudySession.user_id == current_user.id)
+        .order_by(StudySession.created_at.desc())
+    )
     return list(db.scalars(statement).unique())
 
 
 @router.get("/{session_id}", response_model=StudySessionRead)
-def get_session(session_id: str, db: Session = Depends(get_db)) -> StudySession:
-    return _get_session_or_404(db, session_id)
+def get_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StudySession:
+    return _get_session_or_404(db, session_id, current_user.id)
 
 
 @router.post("", response_model=StudySessionRead, status_code=status.HTTP_201_CREATED)
 def create_session(
     payload: SessionCreate,
     db: Session = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ) -> StudySession:
-    user = get_or_create_default_user(db, settings)
-    document = db.get(Document, payload.document_id)
+    statement = select(Document).where(
+        Document.id == payload.document_id,
+        Document.user_id == current_user.id,
+    )
+    document = db.scalars(statement).one_or_none()
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
 
     study_session = StudySession(
-        user_id=user.id,
+        user_id=current_user.id,
         document_id=document.id,
         status="created",
     )
     db.add(study_session)
     db.commit()
-    return _get_session_or_404(db, study_session.id)
+    return _get_session_or_404(db, study_session.id, current_user.id)
+
+
+@router.post("/{session_id}/finish-reading", response_model=StudySessionRead)
+def finish_reading(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StudySession:
+    study_session = _get_session_or_404(db, session_id, current_user.id)
+    study_session.status = "reading_complete"
+    db.add(study_session)
+    db.commit()
+    return _get_session_or_404(db, session_id, current_user.id)
 
 
 @router.post("/{session_id}/audio", response_model=StudySessionRead)
@@ -68,8 +99,9 @@ def upload_audio(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ) -> StudySession:
-    study_session = _get_session_or_404(db, session_id)
+    study_session = _get_session_or_404(db, session_id, current_user.id)
     filename = file.filename or "audio.wav"
     payload = file.file.read()
     if not payload:
@@ -111,7 +143,7 @@ def upload_audio(
 
     db.add(study_session)
     db.commit()
-    return _get_session_or_404(db, session_id)
+    return _get_session_or_404(db, session_id, current_user.id)
 
 
 @router.post("/{session_id}/transcribe", response_model=StudySessionRead)
@@ -119,8 +151,9 @@ def run_transcription(
     session_id: str,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ) -> StudySession:
-    study_session = _get_session_or_404(db, session_id)
+    study_session = _get_session_or_404(db, session_id, current_user.id)
     if not study_session.audio_storage_path or not study_session.audio_storage_bucket:
         raise HTTPException(status_code=400, detail="Upload audio before transcription.")
 
@@ -148,7 +181,7 @@ def run_transcription(
 
     db.add(study_session)
     db.commit()
-    return _get_session_or_404(db, session_id)
+    return _get_session_or_404(db, session_id, current_user.id)
 
 
 @router.post("/{session_id}/assess", response_model=StudySessionRead)
@@ -156,8 +189,9 @@ def run_assessment(
     session_id: str,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ) -> StudySession:
-    study_session = _get_session_or_404(db, session_id)
+    study_session = _get_session_or_404(db, session_id, current_user.id)
     if not study_session.transcript_text:
         raise HTTPException(status_code=400, detail="Transcribe audio before assessment.")
 
@@ -177,7 +211,7 @@ def run_assessment(
 
     db.add(study_session)
     db.commit()
-    return _get_session_or_404(db, session_id)
+    return _get_session_or_404(db, session_id, current_user.id)
 
 
 @router.post("/{session_id}/notes", response_model=StudySessionRead)
@@ -185,8 +219,9 @@ def create_notes(
     session_id: str,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ) -> StudySession:
-    study_session = _get_session_or_404(db, session_id)
+    study_session = _get_session_or_404(db, session_id, current_user.id)
     if study_session.assessment_json is None or not study_session.transcript_text:
         raise HTTPException(status_code=400, detail="Assess the session before generating notes.")
 
@@ -222,4 +257,4 @@ def create_notes(
     study_session.status = "notes_ready"
     db.add(study_session)
     db.commit()
-    return _get_session_or_404(db, session_id)
+    return _get_session_or_404(db, session_id, current_user.id)
