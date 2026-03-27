@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./capybara_coach.db"
     storage_dir: Path = Path("./storage")
     cors_allowed_origins: str = "http://localhost:3000"
+    cors_allowed_origin_regex: str = r"https://.*\.vercel\.app"
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
@@ -45,6 +46,11 @@ class Settings(BaseSettings):
             for origin in self.cors_allowed_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        candidate = self.cors_allowed_origin_regex.strip()
+        return candidate or None
 
 
 @lru_cache(maxsize=1)

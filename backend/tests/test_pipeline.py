@@ -224,6 +224,22 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(fetch_response.status_code, 200)
             self.assertEqual(fetch_response.json()["assessment_feedback"], "Accurate explanation with clear wording.")
 
+    def test_cors_allows_vercel_origins(self) -> None:
+        response = self.client.options(
+            "/auth/register",
+            headers={
+                "Origin": "https://capybara-coach-web.vercel.app",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.headers["access-control-allow-origin"],
+            "https://capybara-coach-web.vercel.app",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
