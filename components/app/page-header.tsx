@@ -13,14 +13,14 @@ export function PageHeader({
     <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="mt-2 font-display text-3xl font-semibold text-white sm:text-4xl">
+        <h1 className="mt-2 font-display text-3xl font-extrabold tracking-[-0.05em] text-[var(--foreground)] sm:text-4xl lg:text-[40px]">
           {title}
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)] sm:text-base">
           {description}
         </p>
       </div>

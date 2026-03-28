@@ -27,17 +27,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       <div className="mx-auto min-h-screen max-w-[1600px] lg:grid lg:grid-cols-[280px_1fr]">
-        <aside className="border-b border-white/10 bg-slate-950/40 px-4 py-5 backdrop-blur-xl lg:min-h-screen lg:border-b-0 lg:border-r lg:px-6 lg:py-8">
+        <aside className="border-b border-[var(--border-soft)] bg-[var(--sidebar)] px-4 py-5 backdrop-blur-[8px] lg:min-h-screen lg:border-b-0 lg:border-r lg:px-6 lg:py-8">
           <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
                 Capybara Coach
               </p>
-              <h1 className="mt-2 font-display text-2xl font-semibold text-white">
+              <h1 className="mt-2 font-display text-2xl font-bold tracking-[-0.04em] text-[var(--primary)]">
                 Study with recall
               </h1>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs text-slate-200">
+            <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5 text-xs text-[var(--muted-foreground)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
               {user?.display_name ?? "Student"}
             </div>
           </div>
@@ -53,10 +53,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "inline-flex items-center gap-3 rounded-2xl border border-transparent px-4 py-3 text-sm font-medium transition-colors",
+                    "inline-flex items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium transition-colors",
                     isActive
-                      ? "border-cyan-400/30 bg-cyan-400/15 text-white"
-                      : "text-slate-300 hover:border-white/10 hover:bg-white/6 hover:text-white",
+                      ? "border-r-4 border-r-[var(--primary)] bg-[var(--sidebar-active)] text-[var(--primary)]"
+                      : "text-[var(--muted-foreground)] hover:bg-[rgba(73,102,64,0.05)] hover:text-[var(--foreground)]",
                   )}
                 >
                   <Icon className="size-4" />
@@ -79,13 +79,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/45 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-10">
+          <header className="sticky top-0 z-20 border-b border-[var(--border-soft)] bg-[rgba(252,249,248,0.82)] px-4 py-4 backdrop-blur-[8px] sm:px-6 lg:px-10">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                   Web MVP
                 </p>
-                <p className="mt-1 text-sm text-slate-200">
+                <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                   Focus on the recall loop: read, explain, assess, save.
                 </p>
               </div>

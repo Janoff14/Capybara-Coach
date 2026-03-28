@@ -74,7 +74,10 @@ export default function LoginPage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="login-password">Password</Label>
-            <Link href="/register" className="text-xs text-slate-400 hover:text-white">
+            <Link
+              href="/register"
+              className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+            >
               New here?
             </Link>
           </div>

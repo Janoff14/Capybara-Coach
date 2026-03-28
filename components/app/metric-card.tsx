@@ -12,11 +12,11 @@ export function MetricCard({
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">{label}</p>
       </CardHeader>
       <CardContent>
-        <p className="font-display text-4xl font-semibold text-white">{value}</p>
-        <p className="mt-2 text-sm text-slate-300">{hint}</p>
+        <p className="font-display text-4xl font-bold tracking-[-0.05em] text-[var(--foreground)]">{value}</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted-soft)]">{hint}</p>
       </CardContent>
     </Card>
   );

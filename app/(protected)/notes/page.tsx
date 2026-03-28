@@ -33,7 +33,7 @@ export default function NotesPage() {
 
       {notesQuery.isLoading ? (
         <Card>
-          <CardContent className="py-8 text-sm text-slate-300">
+          <CardContent className="py-8 text-sm text-[var(--muted-foreground)]">
             Loading saved notes...
           </CardContent>
         </Card>
@@ -64,10 +64,10 @@ export default function NotesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="line-clamp-3 text-sm text-slate-300">
+                  <p className="line-clamp-3 text-sm text-[var(--muted-foreground)]">
                     {note.summary}
                   </p>
-                  <div className="inline-flex items-center gap-2 text-sm font-medium text-cyan-300">
+                  <div className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--primary)]">
                     Open note
                     <ArrowRight className="size-4" />
                   </div>

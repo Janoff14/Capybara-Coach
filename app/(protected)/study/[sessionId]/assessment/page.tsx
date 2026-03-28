@@ -82,7 +82,7 @@ export default function AssessmentPage() {
 
       {sessionQuery.isLoading ? (
         <Card>
-          <CardContent className="py-8 text-sm text-slate-300">
+          <CardContent className="py-8 text-sm text-[var(--muted-foreground)]">
             Loading the assessed session...
           </CardContent>
         </Card>
@@ -157,7 +157,7 @@ export default function AssessmentPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm leading-7 text-slate-200">
+                <p className="text-sm leading-7 text-[var(--muted-foreground)]">
                   {session.assessment_feedback ?? assessment.feedback}
                 </p>
               </CardContent>
@@ -172,11 +172,11 @@ export default function AssessmentPage() {
               </CardHeader>
               <CardContent>
                 {strengths.length === 0 ? (
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-[var(--muted-foreground)]">
                     No specific strengths were returned.
                   </p>
                 ) : (
-                  <ul className="space-y-3 text-sm leading-7 text-slate-200">
+                  <ul className="space-y-3 text-sm leading-7 text-[var(--muted-foreground)]">
                     {strengths.map((item) => (
                       <li key={item}>- {item}</li>
                     ))}
@@ -194,11 +194,11 @@ export default function AssessmentPage() {
               </CardHeader>
               <CardContent>
                 {gaps.length === 0 ? (
-                  <p className="text-sm text-slate-300">
+                  <p className="text-sm text-[var(--muted-foreground)]">
                     No major gaps were returned.
                   </p>
                 ) : (
-                  <ul className="space-y-3 text-sm leading-7 text-slate-200">
+                  <ul className="space-y-3 text-sm leading-7 text-[var(--muted-foreground)]">
                     {gaps.map((item) => (
                       <li key={item}>- {item}</li>
                     ))}

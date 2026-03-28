@@ -139,19 +139,19 @@ export default function StudyRecordPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                     State
                   </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
+                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
                     {recorderStateLabel}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                     Elapsed
                   </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
+                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
                     {formatElapsed(recorder.elapsedSeconds)}
                   </p>
                 </div>
@@ -193,9 +193,9 @@ export default function StudyRecordPage() {
               </div>
 
               {recorder.audioUrl ? (
-                <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm text-slate-200">
-                    <PlayCircle className="size-4 text-cyan-300" />
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-[var(--foreground)]">
+                    <PlayCircle className="size-4 text-[var(--primary)]" />
                     Preview before upload
                   </div>
                   <audio controls className="w-full" src={recorder.audioUrl}>
@@ -226,8 +226,8 @@ export default function StudyRecordPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="rounded-2xl border border-white/10 bg-white/6 p-4 text-sm leading-7 text-slate-200">
-                <p className="font-medium text-white">Aim for this structure</p>
+              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 text-sm leading-7 text-[var(--muted-foreground)]">
+                <p className="font-semibold text-[var(--foreground)]">Aim for this structure</p>
                 <ol className="mt-3 space-y-2">
                   <li>1. State the main idea clearly.</li>
                   <li>2. Cover the key supporting points from memory.</li>
@@ -236,10 +236,10 @@ export default function StudyRecordPage() {
                 </ol>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/6 p-4 text-sm text-slate-300">
-                <p className="font-medium text-white">Current document</p>
+              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 text-sm text-[var(--muted-foreground)]">
+                <p className="font-semibold text-[var(--foreground)]">Current document</p>
                 <p className="mt-2">{document?.title ?? "Loading document..."}</p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
                   {document?.page_count ?? "--"} pages
                 </p>
               </div>

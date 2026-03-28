@@ -17,7 +17,7 @@ function DialogOverlay({
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
-      className={cn("fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm", className)}
+      className={cn("fixed inset-0 z-50 bg-[rgba(252,249,248,0.82)] backdrop-blur-[4px]", className)}
       {...props}
     />
   );
@@ -33,13 +33,13 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-white/10 bg-slate-950/90 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl",
+          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[rgba(229,226,225,0.9)] bg-white p-6 shadow-[0_20px_40px_rgba(28,27,27,0.08)]",
           className,
         )}
         {...props}
       >
         {children}
-        <DialogClose className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition-colors hover:bg-white/8 hover:text-white">
+        <DialogClose className="absolute right-4 top-4 rounded-full p-2 text-[var(--muted-soft)] transition-colors hover:bg-[var(--panel-soft)] hover:text-[var(--foreground)]">
           <X className="size-4" />
           <span className="sr-only">Close</span>
         </DialogClose>
@@ -58,7 +58,7 @@ function DialogTitle({
 }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      className={cn("font-display text-xl font-semibold text-white", className)}
+      className={cn("font-display text-[32px] font-bold tracking-[-0.04em] text-[var(--foreground)]", className)}
       {...props}
     />
   );
@@ -70,7 +70,7 @@ function DialogDescription({
 }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn("text-sm text-slate-300", className)}
+      className={cn("text-sm leading-6 text-[var(--muted-foreground)]", className)}
       {...props}
     />
   );

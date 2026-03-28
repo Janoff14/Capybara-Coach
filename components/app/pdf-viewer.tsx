@@ -41,7 +41,7 @@ export function PdfViewer({
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/30 text-slate-300">
+          <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-dashed border-[rgba(194,200,190,0.5)] bg-[var(--panel-soft)] text-[var(--muted-foreground)]">
             Preparing your PDF preview...
           </div>
         ) : error ? (
@@ -52,10 +52,10 @@ export function PdfViewer({
           <iframe
             title={title}
             src={blobUrl}
-            className="h-[70vh] w-full rounded-2xl border border-white/10 bg-white"
+            className="h-[70vh] w-full rounded-2xl border border-[var(--border-soft)] bg-white"
           />
         ) : (
-          <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/30 text-slate-300">
+          <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-dashed border-[rgba(194,200,190,0.5)] bg-[var(--panel-soft)] text-[var(--muted-foreground)]">
             No PDF preview is available for this document.
           </div>
         )}

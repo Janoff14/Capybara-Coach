@@ -75,11 +75,11 @@ export default function StudyReadPage() {
         description="Use this screen to read the source material clearly, then move straight into the recording step when you are ready to explain it from memory."
         actions={
           <>
-            <div className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-center">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+            <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-3 text-center">
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                 Reading timer
               </p>
-              <p className="mt-1 font-display text-2xl font-semibold text-white">
+              <p className="mt-1 font-display text-2xl font-bold text-[var(--foreground)]">
                 {stopwatch.formatted}
               </p>
             </div>
@@ -113,24 +113,24 @@ export default function StudyReadPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                     Pages
                   </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
+                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
                     {document?.page_count ?? "--"}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                     Elapsed
                   </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
+                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
                     {formatElapsed(stopwatch.elapsedSeconds)}
                   </p>
                 </div>
               </div>
-              <p className="text-sm leading-7 text-slate-300">
+              <p className="text-sm leading-7 text-[var(--muted-foreground)]">
                 {document?.original_filename ?? "Fetching document details..."}
               </p>
             </CardContent>
@@ -144,7 +144,7 @@ export default function StudyReadPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[36rem] overflow-auto whitespace-pre-wrap text-sm leading-7 text-slate-200">
+              <div className="max-h-[36rem] overflow-auto whitespace-pre-wrap text-sm leading-7 text-[var(--muted-foreground)]">
                 {document?.extracted_text ?? "Loading extracted text..."}
               </div>
             </CardContent>

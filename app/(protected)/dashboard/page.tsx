@@ -114,7 +114,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
-              <p className="text-sm text-slate-300">Loading recent documents...</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Loading recent documents...</p>
             ) : documents.length === 0 ? (
               <EmptyState
                 title="No documents yet"
@@ -125,20 +125,20 @@ export default function DashboardPage() {
               documents.slice(0, 3).map((document) => (
                 <div
                   key={document.id}
-                  className="rounded-2xl border border-white/10 bg-white/6 p-4"
+                  className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-medium text-white">{document.title}</p>
-                      <p className="mt-1 text-sm text-slate-300">
+                      <p className="font-semibold text-[var(--foreground)]">{document.title}</p>
+                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                         {document.page_count} page
                         {document.page_count === 1 ? "" : "s"} -{" "}
                         {document.original_filename}
                       </p>
                     </div>
-                    <FileText className="size-5 text-cyan-300" />
+                    <FileText className="size-5 text-[var(--primary)]" />
                   </div>
-                  <p className="mt-3 text-xs text-slate-400">
+                  <p className="mt-3 text-xs text-[var(--muted-foreground)]">
                     Added{" "}
                     {formatDistanceToNow(new Date(document.created_at), {
                       addSuffix: true,
@@ -159,7 +159,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
-              <p className="text-sm text-slate-300">Loading recent sessions...</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Loading recent sessions...</p>
             ) : sessions.length === 0 ? (
               <EmptyState
                 title="No sessions yet"
@@ -170,21 +170,21 @@ export default function DashboardPage() {
                 <Link
                   key={session.id}
                   href={`/study/${session.id}/read`}
-                  className="block rounded-2xl border border-white/10 bg-white/6 p-4 transition-colors hover:bg-white/8"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="font-medium text-white">
+                      <p className="font-semibold text-[var(--foreground)]">
                         {documentMap.get(session.document_id)?.title ??
                           "Study session"}
                       </p>
-                      <p className="mt-1 text-sm text-slate-300">
+                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                         Session {session.id.slice(0, 8)}
                       </p>
                     </div>
                     <SessionStatusBadge status={session.status} />
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                  <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
                     <Clock3 className="size-3.5" />
                     Updated{" "}
                     {formatDistanceToNow(new Date(session.updated_at), {
@@ -206,7 +206,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
-              <p className="text-sm text-slate-300">Loading recent notes...</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Loading recent notes...</p>
             ) : notes.length === 0 ? (
               <EmptyState
                 title="No notes saved"
@@ -217,16 +217,16 @@ export default function DashboardPage() {
                 <Link
                   key={note.id}
                   href={`/notes/${note.id}`}
-                  className="block rounded-2xl border border-white/10 bg-white/6 p-4 transition-colors hover:bg-white/8"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="font-medium text-white">{note.title}</p>
-                      <p className="mt-2 line-clamp-3 text-sm text-slate-300">
+                      <p className="font-semibold text-[var(--foreground)]">{note.title}</p>
+                      <p className="mt-2 line-clamp-3 text-sm text-[var(--muted-foreground)]">
                         {note.summary}
                       </p>
                     </div>
-                    <NotebookPen className="size-5 shrink-0 text-cyan-300" />
+                    <NotebookPen className="size-5 shrink-0 text-[var(--primary)]" />
                   </div>
                 </Link>
               ))
@@ -238,10 +238,10 @@ export default function DashboardPage() {
       <Card>
         <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-display text-xl font-semibold text-white">
+            <p className="font-display text-xl font-bold tracking-[-0.03em] text-[var(--foreground)]">
               Want the cleanest demo path?
             </p>
-            <p className="mt-1 text-sm text-slate-300">
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
               Upload a PDF, start a session from Documents, then follow the
               reading and recording steps straight through.
             </p>

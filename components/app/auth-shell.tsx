@@ -17,10 +17,10 @@ export function AuthShell({
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12 sm:px-6">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(14,165,233,0.12),transparent_32%)]" />
-      <Card className="relative w-full max-w-lg">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(133,165,121,0.14),transparent_28%),radial-gradient(circle_at_top_center,rgba(245,212,140,0.1),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(133,165,121,0.08),transparent_28%)]" />
+      <Card className="relative w-full max-w-lg rounded-[24px]">
         <CardHeader>
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300/80">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
             Capybara Coach
           </p>
           <CardTitle className="text-3xl">{title}</CardTitle>
@@ -28,11 +28,11 @@ export function AuthShell({
         </CardHeader>
         <CardContent className="space-y-6">
           {children}
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-[var(--muted-foreground)]">
             {isLogin ? "Need an account?" : "Already have an account?"}{" "}
             <Link
               href={isLogin ? "/register" : "/login"}
-              className="font-semibold text-cyan-300 hover:text-cyan-200"
+              className="font-semibold text-[var(--primary)] hover:text-[var(--primary-strong)]"
             >
               {isLogin ? "Create one now" : "Sign in instead"}
             </Link>

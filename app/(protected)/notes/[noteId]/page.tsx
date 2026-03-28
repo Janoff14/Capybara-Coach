@@ -32,7 +32,7 @@ export default function NoteDetailPage() {
 
       {noteQuery.isLoading ? (
         <Card>
-          <CardContent className="py-8 text-sm text-slate-300">
+          <CardContent className="py-8 text-sm text-[var(--muted-foreground)]">
             Loading note detail...
           </CardContent>
         </Card>
@@ -51,7 +51,7 @@ export default function NoteDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-7 text-slate-200">{note.summary}</p>
+              <p className="text-sm leading-7 text-[var(--muted-foreground)]">{note.summary}</p>
             </CardContent>
           </Card>
 
@@ -63,7 +63,7 @@ export default function NoteDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="whitespace-pre-wrap text-sm leading-8 text-slate-100">
+              <div className="whitespace-pre-wrap text-sm leading-8 text-[var(--foreground)]">
                 {note.content}
               </div>
             </CardContent>

@@ -109,7 +109,7 @@ export function UploadDocumentDialog({
               accept="application/pdf,.pdf"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[var(--muted-foreground)]">
               {file ? `Selected: ${file.name}` : "Choose a single PDF file."}
             </p>
           </div>

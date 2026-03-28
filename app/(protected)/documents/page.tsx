@@ -71,7 +71,7 @@ export default function DocumentsPage() {
 
       {documentsQuery.isLoading ? (
         <Card>
-          <CardContent className="py-8 text-sm text-slate-300">
+          <CardContent className="py-8 text-sm text-[var(--muted-foreground)]">
             Loading your document library...
           </CardContent>
         </Card>
@@ -93,35 +93,35 @@ export default function DocumentsPage() {
                       {document.original_filename}
                     </CardDescription>
                   </div>
-                  <FileText className="size-5 text-cyan-300" />
+                  <FileText className="size-5 text-[var(--primary)]" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="grid grid-cols-2 gap-3 text-sm text-slate-300">
-                  <div className="rounded-2xl border border-white/10 bg-white/6 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                <div className="grid grid-cols-2 gap-3 text-sm text-[var(--muted-foreground)]">
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                       Pages
                     </p>
-                    <p className="mt-2 text-lg font-semibold text-white">
+                    <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
                       {document.page_count}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/6 p-3">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                       Type
                     </p>
-                    <p className="mt-2 text-lg font-semibold text-white">
+                    <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
                       {document.source_type.toUpperCase()}
                     </p>
                   </div>
                 </div>
 
-                <p className="line-clamp-4 text-sm leading-7 text-slate-300">
+                <p className="line-clamp-4 text-sm leading-7 text-[var(--muted-foreground)]">
                   {document.extracted_text}
                 </p>
 
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[var(--muted-foreground)]">
                     Added {formatDistanceToNow(new Date(document.created_at), { addSuffix: true })}
                   </p>
                   <Button

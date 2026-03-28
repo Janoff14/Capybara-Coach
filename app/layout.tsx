@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Manrope, Sora } from "next/font/google";
+import { Inter, Manrope } from "next/font/google";
 
 import { AppProviders } from "@/app/providers";
 import "@/app/globals.css";
 
-const sora = Sora({
-  variable: "--font-sora",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -25,10 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${sora.variable} ${manrope.variable} min-h-full scroll-smooth`}
-    >
+    <html lang="en" className={`${manrope.variable} ${inter.variable} min-h-full scroll-smooth`}>
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">
         <AppProviders>{children}</AppProviders>
       </body>
