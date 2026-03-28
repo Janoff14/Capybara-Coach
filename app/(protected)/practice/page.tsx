@@ -225,6 +225,28 @@ function PracticeDeckPlayer({
   const activeCard = deck.cards[cardIndex];
   const isLastCard = cardIndex === deck.cards.length - 1;
 
+  const ensureReviewScheduleMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) {
+        throw new Error("You need to be logged in to enable review scheduling.");
+      }
+
+      return api.generateFlashcards(token, deck.sessionId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["flashcards"] });
+      await queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      toast.success("Review scheduling is now active for this deck.");
+    },
+    onError: (error) => {
+      const message =
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Could not enable review scheduling.";
+      toast.error(message);
+    },
+  });
+
   const gradeReviewMutation = useMutation({
     mutationFn: async (rating: "easy" | "medium" | "hard") => {
       if (!token) {
@@ -403,35 +425,58 @@ function PracticeDeckPlayer({
         </Button>
       </div>
 
-      {review && isLastCard && showAnswer ? (
+      {isLastCard ? (
         <Card>
           <CardHeader>
-            <CardTitle>Grade this review</CardTitle>
+            <CardTitle>Finish this deck</CardTitle>
             <CardDescription>
-              Tell the scheduler how this deck felt so it can decide when to bring it back.
+              {showAnswer
+                ? review
+                  ? "Tell the scheduler how this deck felt so it can decide when to bring it back."
+                  : "Enable review scheduling for this older deck so it can reappear on the dashboard."
+                : "Reveal the final answer first, then grade how this review felt."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            <Button
-              variant="secondary"
-              onClick={() => gradeReviewMutation.mutate("hard")}
-              disabled={gradeReviewMutation.isPending}
-            >
-              Hard
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => gradeReviewMutation.mutate("medium")}
-              disabled={gradeReviewMutation.isPending}
-            >
-              Medium
-            </Button>
-            <Button
-              onClick={() => gradeReviewMutation.mutate("easy")}
-              disabled={gradeReviewMutation.isPending}
-            >
-              Easy
-            </Button>
+          <CardContent className="space-y-4">
+            {!showAnswer ? (
+              <Button className="w-full" onClick={() => setShowAnswer(true)}>
+                <Eye className="size-4" />
+                Reveal final answer
+              </Button>
+            ) : review ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => gradeReviewMutation.mutate("hard")}
+                  disabled={gradeReviewMutation.isPending}
+                >
+                  Hard
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => gradeReviewMutation.mutate("medium")}
+                  disabled={gradeReviewMutation.isPending}
+                >
+                  Medium
+                </Button>
+                <Button
+                  onClick={() => gradeReviewMutation.mutate("easy")}
+                  disabled={gradeReviewMutation.isPending}
+                >
+                  Easy
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-full"
+                onClick={() => ensureReviewScheduleMutation.mutate()}
+                disabled={ensureReviewScheduleMutation.isPending}
+              >
+                {ensureReviewScheduleMutation.isPending
+                  ? "Enabling review schedule..."
+                  : "Start review scheduling"}
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : null}
