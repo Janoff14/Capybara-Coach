@@ -234,11 +234,14 @@ export const api = {
     });
   },
 
-  assessSession(token: string, sessionId: string) {
-    return request<StudySessionRead>(`/sessions/${sessionId}/assess`, {
+  assessSession(token: string, sessionId: string, strictness = 50) {
+    return request<StudySessionRead>(
+      `/sessions/${sessionId}/assess?strictness=${encodeURIComponent(String(strictness))}`,
+      {
       method: "POST",
       token,
-    });
+      },
+    );
   },
 
   generateNotes(token: string, sessionId: string) {

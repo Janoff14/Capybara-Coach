@@ -154,10 +154,25 @@ class PipelineApiTests(unittest.TestCase):
                 "app.api.routes.sessions.assess_transcript",
                 return_value={
                     "score": 91,
+                    "strictness": 72,
+                    "verdict": "Strong recall with one missing layer of detail.",
+                    "criteria": {
+                        "coverage": 90,
+                        "accuracy": 92,
+                        "clarity": 89,
+                        "structure": 88,
+                        "depth": 80,
+                    },
+                    "covered_well": ["Defines inertia well"],
+                    "missing": ["Could state the role of net force more explicitly"],
+                    "weak_areas": ["Structure gets slightly compressed near the end"],
+                    "next_steps": ["Add one concrete example of the law in action"],
                     "accuracy": 92,
                     "coverage": 90,
                     "clarity": 89,
                     "examples": 80,
+                    "structure": 88,
+                    "depth": 80,
                     "feedback": "Accurate explanation with clear wording.",
                     "strengths": ["Defines inertia well"],
                     "gaps": ["Could add a concrete example"],
@@ -255,11 +270,19 @@ class PipelineApiTests(unittest.TestCase):
             self.assertIn("force changes it", transcribe_response.json()["transcript_text"])
 
             assess_response = self.client.post(
-                f"/sessions/{study_session['id']}/assess",
+                f"/sessions/{study_session['id']}/assess?strictness=72",
                 headers=headers,
             )
             self.assertEqual(assess_response.status_code, 200)
             self.assertEqual(assess_response.json()["assessment_score"], 91)
+            self.assertEqual(
+                assess_response.json()["assessment_json"]["strictness"],
+                72,
+            )
+            self.assertEqual(
+                assess_response.json()["assessment_json"]["criteria"]["structure"],
+                88,
+            )
 
             notes_response = self.client.post(
                 f"/sessions/{study_session['id']}/notes",

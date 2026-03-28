@@ -53,8 +53,10 @@ def assess_transcript(
     *,
     transcript: str,
     source_text: str,
+    strictness: int,
     settings: Settings,
 ) -> dict[str, Any]:
+    clamped_strictness = max(0, min(100, int(strictness)))
     prompt = f"""
 Compare the student's explanation to the source.
 
@@ -65,20 +67,31 @@ Student:
 {transcript}
 
 Score out of 100 based on:
-- accuracy
 - coverage
+- accuracy
 - clarity
-- examples
+- structure
+- depth
+
+Strictness:
+{clamped_strictness}/100
 
 Return JSON only with these keys:
 - score
-- accuracy
-- coverage
-- clarity
-- examples
+- verdict
 - feedback
-- strengths
-- gaps
+- covered_well
+- missing
+- weak_areas
+- next_steps
+- criteria
+
+Rules:
+- "criteria" must be an object with numeric scores for coverage, accuracy, clarity, structure, and depth.
+- "covered_well", "missing", "weak_areas", and "next_steps" should each contain 2 to 5 short bullets.
+- At low strictness, reward correct big-picture understanding even if phrasing is rough.
+- At high strictness, penalize missing precision, weak structure, and shallow explanation more heavily.
+- Keep feedback direct, useful, and specific.
 """
 
     content = _chat_json(
@@ -87,15 +100,33 @@ Return JSON only with these keys:
         user_prompt=prompt,
     )
     payload = _parse_json_payload(content)
+    criteria = _normalize_assessment_criteria(payload)
+    score = _coerce_score(payload.get("score"))
+    covered_well = _assessment_list(payload, "covered_well", "strengths")
+    missing = _assessment_list(payload, "missing", "gaps")
+    weak_areas = _assessment_list(payload, "weak_areas")
+    next_steps = _assessment_list(payload, "next_steps")
+    verdict = str(payload.get("verdict") or _default_assessment_verdict(score, clamped_strictness)).strip()
+    feedback = str(payload.get("feedback") or verdict or "No feedback returned.").strip()
+
     return {
-        "score": _coerce_score(payload.get("score")),
-        "accuracy": _coerce_score(payload.get("accuracy")),
-        "coverage": _coerce_score(payload.get("coverage")),
-        "clarity": _coerce_score(payload.get("clarity")),
-        "examples": _coerce_score(payload.get("examples")),
-        "feedback": str(payload.get("feedback") or "No feedback returned."),
-        "strengths": _string_list(payload.get("strengths")),
-        "gaps": _string_list(payload.get("gaps")),
+        "score": score,
+        "strictness": clamped_strictness,
+        "verdict": verdict,
+        "feedback": feedback,
+        "criteria": criteria,
+        "covered_well": covered_well,
+        "missing": missing,
+        "weak_areas": weak_areas,
+        "next_steps": next_steps,
+        "coverage": criteria["coverage"],
+        "accuracy": criteria["accuracy"],
+        "clarity": criteria["clarity"],
+        "structure": criteria["structure"],
+        "depth": criteria["depth"],
+        "examples": criteria["depth"],
+        "strengths": covered_well,
+        "gaps": _dedupe_strings([*missing, *weak_areas]),
     }
 
 
@@ -443,6 +474,53 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _dedupe_strings(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        key = value.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(value.strip())
+    return deduped
+
+
+def _assessment_list(payload: dict[str, Any], *keys: str) -> list[str]:
+    for key in keys:
+        values = _string_list(payload.get(key))
+        if values:
+            return values[:5]
+    return []
+
+
+def _normalize_assessment_criteria(payload: dict[str, Any]) -> dict[str, int]:
+    criteria_payload = payload.get("criteria")
+    criteria_source = criteria_payload if isinstance(criteria_payload, dict) else {}
+
+    return {
+        "coverage": _coerce_score(criteria_source.get("coverage") or payload.get("coverage")),
+        "accuracy": _coerce_score(criteria_source.get("accuracy") or payload.get("accuracy")),
+        "clarity": _coerce_score(criteria_source.get("clarity") or payload.get("clarity")),
+        "structure": _coerce_score(criteria_source.get("structure") or payload.get("structure")),
+        "depth": _coerce_score(criteria_source.get("depth") or payload.get("depth") or payload.get("examples")),
+    }
+
+
+def _default_assessment_verdict(score: int, strictness: int) -> str:
+    if score >= 90:
+        return "Excellent recall. You covered the material with strong control and precision."
+    if score >= 75:
+        return (
+            "Solid understanding overall. A little more precision and structure would sharpen it."
+            if strictness >= 60
+            else "Solid understanding overall. You have the main ideas and only need a bit more polish."
+        )
+    if score >= 55:
+        return "You have a workable foundation, but key details and clearer structure are still missing."
+    return "The explanation needs another pass. Rebuild it around the core concepts before moving on."
 
 
 def _reader_terms(value: Any) -> list[dict[str, str]]:

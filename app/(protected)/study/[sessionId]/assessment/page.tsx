@@ -1,7 +1,18 @@
 "use client";
 
+import { type ReactNode, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  CircleDot,
+  RefreshCw,
+  SlidersHorizontal,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/app/empty-state";
@@ -18,12 +29,152 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
+import type { AssessmentJson } from "@/lib/types";
+
+const CRITERIA_ORDER = [
+  {
+    key: "coverage",
+    label: "Coverage",
+    hint: "Did you bring in the important ideas?",
+  },
+  {
+    key: "accuracy",
+    label: "Accuracy",
+    hint: "Were the facts and relationships correct?",
+  },
+  {
+    key: "clarity",
+    label: "Clarity",
+    hint: "Could someone follow the explanation easily?",
+  },
+  {
+    key: "structure",
+    label: "Structure",
+    hint: "Did the explanation unfold in a coherent order?",
+  },
+  {
+    key: "depth",
+    label: "Depth",
+    hint: "Did you go beyond surface-level recall?",
+  },
+] as const;
+
+type AssessmentCriteriaKey = (typeof CRITERIA_ORDER)[number]["key"];
+
+function clampStrictness(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function getStrictnessProfile(strictness: number) {
+  if (strictness <= 33) {
+    return {
+      label: "Supportive",
+      description: "Rewards rough but correct understanding and gives you more room to think aloud.",
+    };
+  }
+
+  if (strictness <= 66) {
+    return {
+      label: "Balanced",
+      description: "Pushes for the key ideas while still allowing natural, imperfect delivery.",
+    };
+  }
+
+  return {
+    label: "Demanding",
+    description: "Expects precision, cleaner structure, and fewer missing details.",
+  };
+}
+
+function getScoreMood(score: number) {
+  if (score >= 85) {
+    return "Strong recall";
+  }
+
+  if (score >= 65) {
+    return "Promising, but uneven";
+  }
+
+  return "Needs another pass";
+}
+
+function deriveCriteria(assessment: AssessmentJson) {
+  return {
+    coverage: assessment.criteria?.coverage ?? assessment.coverage ?? 0,
+    accuracy: assessment.criteria?.accuracy ?? assessment.accuracy ?? 0,
+    clarity: assessment.criteria?.clarity ?? assessment.clarity ?? 0,
+    structure: assessment.criteria?.structure ?? assessment.structure ?? 0,
+    depth: assessment.criteria?.depth ?? assessment.depth ?? assessment.examples ?? 0,
+  };
+}
+
+function deriveList(
+  preferred: string[] | undefined,
+  fallback: string[] | undefined,
+) {
+  return preferred && preferred.length > 0 ? preferred : fallback ?? [];
+}
+
+function scoreBarClass(score: number) {
+  if (score >= 85) {
+    return "bg-[linear-gradient(90deg,rgba(73,102,64,0.92),rgba(118,158,107,0.88))]";
+  }
+
+  if (score >= 65) {
+    return "bg-[linear-gradient(90deg,rgba(93,104,54,0.92),rgba(177,160,94,0.85))]";
+  }
+
+  return "bg-[linear-gradient(90deg,rgba(146,79,72,0.92),rgba(211,137,126,0.85))]";
+}
+
+function BreakdownCard({
+  icon,
+  title,
+  description,
+  items,
+  emptyMessage,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  items: string[];
+  emptyMessage: string;
+}) {
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2 text-[var(--foreground)]">
+          {icon}
+          <CardTitle>{title}</CardTitle>
+        </div>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <p className="text-sm leading-7 text-[var(--muted-foreground)]">{emptyMessage}</p>
+        ) : (
+          <ul className="space-y-3">
+            {items.map((item) => (
+              <li
+                key={item}
+                className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-3 text-sm leading-7 text-[var(--muted-foreground)]"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function AssessmentPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { token } = useAuth();
+  const [strictnessOverride, setStrictnessOverride] = useState<number | null>(null);
 
   const sessionQuery = useQuery({
     queryKey: ["sessions", params.sessionId],
@@ -35,6 +186,30 @@ export default function AssessmentPage() {
     queryKey: ["documents", sessionQuery.data?.document_id],
     enabled: Boolean(token && sessionQuery.data?.document_id),
     queryFn: () => api.getDocument(sessionQuery.data!.document_id, token!),
+  });
+
+  const rerunAssessmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) {
+        throw new Error("You need to be logged in to reassess this session.");
+      }
+
+      return api.assessSession(token, params.sessionId, strictness);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["sessions", params.sessionId],
+      });
+      toast.success("Assessment updated.");
+    },
+    onError: (error) => {
+      const message =
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Could not refresh the assessment.";
+      toast.error(message);
+    },
   });
 
   const generateNotesMutation = useMutation({
@@ -68,15 +243,33 @@ export default function AssessmentPage() {
   const session = sessionQuery.data;
   const assessment = session?.assessment_json;
   const document = documentQuery.data;
-  const strengths = assessment?.strengths ?? [];
-  const gaps = assessment?.gaps ?? [];
+
+  const criteria = useMemo(
+    () => (assessment ? deriveCriteria(assessment) : null),
+    [assessment],
+  );
+  const coveredWell = useMemo(
+    () => deriveList(assessment?.covered_well, assessment?.strengths),
+    [assessment],
+  );
+  const missing = useMemo(
+    () => deriveList(assessment?.missing, assessment?.gaps),
+    [assessment],
+  );
+  const weakAreas = assessment?.weak_areas ?? [];
+  const nextSteps = assessment?.next_steps ?? [];
+  const appliedStrictness = clampStrictness(assessment?.strictness ?? 50);
+  const strictness = strictnessOverride ?? appliedStrictness;
+  const strictnessProfile = getStrictnessProfile(strictness);
+  const canOpenNotes = Boolean(session?.note);
+  const hasStrictnessChanged = strictness !== appliedStrictness;
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Assessment"
         title={document?.title ?? "Assessment results"}
-        description="This screen compares your spoken explanation against the source material and shows what you covered well and what still needs work."
+        description="This review checks what you covered, what you missed, and how clearly your explanation held together."
         actions={session ? <SessionStatusBadge status={session.status} /> : null}
       />
 
@@ -86,7 +279,7 @@ export default function AssessmentPage() {
             Loading the assessed session...
           </CardContent>
         </Card>
-      ) : !session || !assessment ? (
+      ) : !session || !assessment || !criteria ? (
         <EmptyState
           title="Assessment is not ready yet"
           description="Upload a recording and let the app finish transcription and assessment before you open this page."
@@ -98,115 +291,254 @@ export default function AssessmentPage() {
         />
       ) : (
         <>
-          <section className="surface-grid-3">
-            <MetricCard
-              label="Overall score"
-              value={String(session.assessment_score ?? assessment.score)}
-              hint="How well your explanation matched the source."
-            />
-            <MetricCard
-              label="Accuracy"
-              value={String(assessment.accuracy)}
-              hint="Did you explain the material correctly?"
-            />
-            <MetricCard
-              label="Coverage"
-              value={String(assessment.coverage)}
-              hint="How much of the source did you include?"
-            />
-          </section>
+          <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr_0.8fr]">
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="border-b border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(73,102,64,0.12),rgba(255,255,255,0.3))] px-6 py-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
+                    Overall score
+                  </p>
+                  <div className="mt-4 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="font-display text-7xl font-bold tracking-[-0.07em] text-[var(--foreground)]">
+                        {assessment.score}
+                      </p>
+                      <p className="mt-2 text-sm font-medium uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        {getScoreMood(assessment.score)}
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-[var(--border-soft)] bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                      Strictness {appliedStrictness}
+                    </div>
+                  </div>
+                  <p className="mt-4 max-w-xl text-base leading-8 text-[var(--muted-foreground)]">
+                    {assessment.verdict || session.assessment_feedback || assessment.feedback}
+                  </p>
+                </div>
+                <div className="grid gap-4 px-6 py-5 md:grid-cols-3">
+                  <MetricCard
+                    label="Coverage"
+                    value={String(criteria.coverage)}
+                    hint="How much of the important material made it into your recall."
+                  />
+                  <MetricCard
+                    label="Accuracy"
+                    value={String(criteria.accuracy)}
+                    hint="Whether the details and relationships stayed correct."
+                  />
+                  <MetricCard
+                    label="Depth"
+                    value={String(criteria.depth)}
+                    hint="Whether you moved beyond a surface-level summary."
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-          <section className="surface-grid-3">
-            <MetricCard
-              label="Clarity"
-              value={String(assessment.clarity)}
-              hint="How clearly your explanation came across."
-            />
-            <MetricCard
-              label="Examples"
-              value={String(assessment.examples)}
-              hint="Whether your explanation used concrete examples."
-            />
             <Card>
               <CardHeader>
-                <CardTitle>Next step</CardTitle>
+                <div className="flex items-center gap-2 text-[var(--foreground)]">
+                  <SlidersHorizontal className="size-4 text-[var(--primary)]" />
+                  <CardTitle>Strictness</CardTitle>
+                </div>
                 <CardDescription>
-                  Turn the assessment into a cleaned-up note you can review later.
+                  Change how demanding the evaluator is, then rerun the assessment on the same transcript.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-5">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        Current lens
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                        {strictnessProfile.label}
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)]">
+                      {strictness}
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={strictness}
+                    onChange={(event) =>
+                      setStrictnessOverride(clampStrictness(Number(event.target.value)))
+                    }
+                    className="mt-5 h-2 w-full cursor-pointer appearance-none rounded-full bg-[rgba(73,102,64,0.12)] accent-[var(--primary)]"
+                  />
+                  <div className="mt-3 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                    <span>Supportive</span>
+                    <span>Balanced</span>
+                    <span>Demanding</span>
+                  </div>
+                </div>
+
+                <p className="text-sm leading-7 text-[var(--muted-foreground)]">
+                  {strictnessProfile.description}
+                </p>
+
+                <Button
+                  className="w-full"
+                  variant={hasStrictnessChanged ? "default" : "secondary"}
+                  onClick={() => rerunAssessmentMutation.mutate()}
+                  disabled={rerunAssessmentMutation.isPending}
+                >
+                  <RefreshCw className={rerunAssessmentMutation.isPending ? "size-4 animate-spin" : "size-4"} />
+                  {rerunAssessmentMutation.isPending
+                    ? "Reassessing..."
+                    : hasStrictnessChanged
+                      ? "Apply strictness and reassess"
+                      : "Run assessment again"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2 text-[var(--foreground)]">
+                  <Sparkles className="size-4 text-[var(--primary)]" />
+                  <CardTitle>Next step</CardTitle>
+                </div>
+                <CardDescription>
+                  Turn this feedback into polished notes you can revisit later.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                    Notes flow
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+                    The note generator uses this transcript, the source text, and the current assessment lens.
+                  </p>
+                </div>
                 <Button
                   className="w-full"
                   onClick={() => generateNotesMutation.mutate()}
                   disabled={generateNotesMutation.isPending}
                 >
-                  {generateNotesMutation.isPending
-                    ? "Generating notes..."
-                    : "Generate notes"}
+                  {generateNotesMutation.isPending ? "Generating notes..." : "Generate notes"}
                 </Button>
+                {canOpenNotes ? (
+                  <Button
+                    className="w-full"
+                    variant="secondary"
+                    onClick={() => router.push(`/notes/${session.note!.id}`)}
+                  >
+                    Open latest note
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
           </section>
 
-          <div className="surface-grid xl:grid-cols-[1fr_1fr_1fr] xl:grid">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {CRITERIA_ORDER.map((criterion) => {
+              const value = criteria[criterion.key as AssessmentCriteriaKey];
+              return (
+                <Card key={criterion.key}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">{criterion.label}</CardTitle>
+                    <CardDescription>{criterion.hint}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-end justify-between gap-3">
+                      <p className="font-display text-4xl font-bold tracking-[-0.05em] text-[var(--foreground)]">
+                        {value}
+                      </p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                        / 100
+                      </p>
+                    </div>
+                    <div className="mt-4 h-2 rounded-full bg-[rgba(73,102,64,0.10)]">
+                      <div
+                        className={`h-full rounded-full ${scoreBarClass(value)}`}
+                        style={{ width: `${Math.max(6, value)}%` }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-3">
+            <BreakdownCard
+              icon={<CheckCircle2 className="size-4 text-[var(--primary)]" />}
+              title="Covered well"
+              description="These are the points you landed cleanly."
+              items={coveredWell}
+              emptyMessage="No standout strengths were returned yet."
+            />
+            <BreakdownCard
+              icon={<AlertTriangle className="size-4 text-[hsl(17_72%_44%)]" />}
+              title="Missing"
+              description="Important ideas that still need to show up in your explanation."
+              items={missing}
+              emptyMessage="No clear missing concepts were flagged."
+            />
+            <BreakdownCard
+              icon={<CircleDot className="size-4 text-[hsl(43_70%_42%)]" />}
+              title="Weak areas"
+              description="Parts that were present, but not strong or precise enough yet."
+              items={weakAreas}
+              emptyMessage="No weak-but-present areas were singled out."
+            />
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <Card>
               <CardHeader>
-                <CardTitle>Feedback</CardTitle>
+                <CardTitle>Evaluator note</CardTitle>
                 <CardDescription>
-                  Summary commentary from the evaluator.
+                  A concise read on how this explanation came across.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-7 text-[var(--muted-foreground)]">
-                  {session.assessment_feedback ?? assessment.feedback}
-                </p>
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
+                  <p className="text-sm leading-8 text-[var(--muted-foreground)]">
+                    {session.assessment_feedback ?? assessment.feedback}
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Strengths</CardTitle>
+                <div className="flex items-center gap-2 text-[var(--foreground)]">
+                  <Target className="size-4 text-[var(--primary)]" />
+                  <CardTitle>Next focus</CardTitle>
+                </div>
                 <CardDescription>
-                  What the evaluator thought you did well.
+                  A tighter checklist for the next recall attempt.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {strengths.length === 0 ? (
-                  <p className="text-sm text-[var(--muted-foreground)]">
-                    No specific strengths were returned.
+                {nextSteps.length === 0 ? (
+                  <p className="text-sm leading-7 text-[var(--muted-foreground)]">
+                    No next-step checklist was returned. Rerunning the assessment can usually fill this in.
                   </p>
                 ) : (
-                  <ul className="space-y-3 text-sm leading-7 text-[var(--muted-foreground)]">
-                    {strengths.map((item) => (
-                      <li key={item}>- {item}</li>
+                  <ul className="space-y-3">
+                    {nextSteps.map((step) => (
+                      <li
+                        key={step}
+                        className="flex gap-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-3 text-sm leading-7 text-[var(--muted-foreground)]"
+                      >
+                        <ChevronRight className="mt-1 size-4 shrink-0 text-[var(--primary)]" />
+                        <span>{step}</span>
+                      </li>
                     ))}
                   </ul>
                 )}
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Gaps</CardTitle>
-                <CardDescription>
-                  Areas to cover more completely next time.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {gaps.length === 0 ? (
-                  <p className="text-sm text-[var(--muted-foreground)]">
-                    No major gaps were returned.
-                  </p>
-                ) : (
-                  <ul className="space-y-3 text-sm leading-7 text-[var(--muted-foreground)]">
-                    {gaps.map((item) => (
-                      <li key={item}>- {item}</li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          </section>
         </>
       )}
     </div>

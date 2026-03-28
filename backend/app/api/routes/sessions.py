@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -238,6 +238,7 @@ def run_transcription(
 @router.post("/{session_id}/assess", response_model=StudySessionRead)
 def run_assessment(
     session_id: str,
+    strictness: int = Query(50, ge=0, le=100),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     current_user: User = Depends(get_current_user),
@@ -250,6 +251,7 @@ def run_assessment(
         assessment = assess_transcript(
             transcript=study_session.transcript_text,
             source_text=study_session.document.extracted_text,
+            strictness=strictness,
             settings=settings,
         )
     except RuntimeError as exc:

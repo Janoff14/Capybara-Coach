@@ -75,9 +75,24 @@ export type NoteJson = {
 
 export type AssessmentJson = {
   score: number;
+  strictness: number;
+  verdict: string;
+  criteria: {
+    coverage: number;
+    accuracy: number;
+    clarity: number;
+    structure: number;
+    depth: number;
+  };
+  covered_well: string[];
+  missing: string[];
+  weak_areas: string[];
+  next_steps: string[];
   accuracy: number;
   coverage: number;
   clarity: number;
+  structure: number;
+  depth: number;
   examples: number;
   feedback: string;
   strengths: string[];
