@@ -3,6 +3,7 @@ import type {
   DocumentRead,
   LoginInput,
   NoteRead,
+  RecallHintRead,
   RegisterInput,
   StudySessionRead,
   TokenResponse,
@@ -201,6 +202,18 @@ export const api = {
     formData.append("file", file);
 
     return request<StudySessionRead>(`/sessions/${sessionId}/audio`, {
+      method: "POST",
+      token,
+      body: formData,
+    });
+  },
+
+  getRecallHint(token: string, sessionId: string, file: File, strictness = 50) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("strictness", String(strictness));
+
+    return request<RecallHintRead>(`/sessions/${sessionId}/recall-hint`, {
       method: "POST",
       token,
       body: formData,

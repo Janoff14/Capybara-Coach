@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileLock2, Mic, PauseCircle, PlayCircle, Sparkles, Square, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+import { CapybaraCoach } from "@/components/app/capybara-coach";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
 import { RecallSessionPanel } from "@/components/app/recall-session-panel";
@@ -16,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { api, ApiError } from "@/lib/api";
 import { buildReaderGuide } from "@/lib/document-reader";
 import { buildRecallChecklist, buildRecallPrompts } from "@/lib/recall";
+import type { RecallHintRead } from "@/lib/types";
 import { useMediaRecorder } from "@/hooks/use-media-recorder";
 import { formatElapsed } from "@/lib/utils";
 
@@ -45,6 +47,11 @@ export default function StudyRecordPage() {
   const autoStartRequested = searchParams.get("autostart") === "1";
   const autoStartAttemptedRef = useRef(false);
   const [enteredFromReader] = useState(autoStartRequested);
+  const [activeHint, setActiveHint] = useState<RecallHintRead | null>(null);
+  const currentPauseHintedRef = useRef(false);
+  const lastHintAtRef = useRef(0);
+  const hintCountRef = useRef(0);
+  const lastHintMessageRef = useRef("");
 
   const sessionQuery = useQuery({
     queryKey: ["sessions", params.sessionId],
@@ -112,6 +119,45 @@ export default function StudyRecordPage() {
   const canOpenAssessment =
     session?.status === "assessed" || session?.status === "notes_ready";
 
+  const recallHintMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) {
+        throw new Error("You need to be logged in to request recall hints.");
+      }
+
+      const hintBlob = recorder.getRecentAudioBlob(14000);
+      if (!hintBlob || hintBlob.size < 1024) {
+        throw new Error("Not enough recent speech to generate a hint.");
+      }
+
+      const hintFile = new File([hintBlob], `recall-hint-${params.sessionId}.webm`, {
+        type: recorder.mimeType || "audio/webm",
+      });
+
+      return api.getRecallHint(token, params.sessionId, hintFile);
+    },
+    onSuccess: (hint: RecallHintRead) => {
+      const nextMessage =
+        hint.message === lastHintMessageRef.current
+          ? "Push one step deeper. What is still missing from the explanation?"
+          : hint.message;
+
+      lastHintMessageRef.current = nextMessage;
+      setActiveHint({
+        ...hint,
+        message: nextMessage,
+      });
+      lastHintAtRef.current = Date.now();
+      currentPauseHintedRef.current = true;
+      hintCountRef.current += 1;
+    },
+    onError: () => {
+      setActiveHint(null);
+      lastHintAtRef.current = Date.now();
+      currentPauseHintedRef.current = true;
+    },
+  });
+
   useEffect(() => {
     if (!autoStartRequested || autoStartAttemptedRef.current) {
       return;
@@ -129,6 +175,107 @@ export default function StudyRecordPage() {
     params.sessionId,
     recorder,
     router,
+  ]);
+
+  useEffect(() => {
+    if (!recorder.isRecording && !recorder.audioBlob) {
+      currentPauseHintedRef.current = false;
+      hintCountRef.current = 0;
+      lastHintAtRef.current = 0;
+      lastHintMessageRef.current = "";
+      return;
+    }
+
+    if (!recorder.isRecording) {
+      return;
+    }
+
+    if (recorder.hasSpoken && recorder.silenceDurationMs < 1200) {
+      currentPauseHintedRef.current = false;
+    }
+
+    if (!recorder.hasSpoken || recorder.silenceDurationMs < 4200) {
+      return;
+    }
+
+    if (recallHintMutation.isPending || currentPauseHintedRef.current) {
+      return;
+    }
+
+    if (hintCountRef.current >= 3) {
+      return;
+    }
+
+    if (Date.now() - lastHintAtRef.current < 12000) {
+      return;
+    }
+
+    recallHintMutation.mutate();
+  }, [
+    recallHintMutation,
+    recorder.audioBlob,
+    recorder.hasSpoken,
+    recorder.isRecording,
+    recorder.silenceDurationMs,
+  ]);
+
+  const coach = useMemo(() => {
+    if (!recorder.isRecording) {
+      if (recorder.audioBlob) {
+        return {
+          state: "encouraging" as const,
+          promptType: null,
+          message: "Nice. Listen once if you want, then submit this take for feedback.",
+        };
+      }
+
+      return {
+        state: "idle" as const,
+        promptType: null,
+        message: "When you are ready, explain the document from memory. I will stay quiet unless you stall.",
+      };
+    }
+
+    if (recallHintMutation.isPending) {
+      return {
+        state: "thinking" as const,
+        promptType: null,
+        message: "Thinking about the gap in your explanation...",
+      };
+    }
+
+    if (activeHint && recorder.silenceDurationMs >= 1200) {
+      return {
+        state: activeHint.state,
+        promptType: activeHint.prompt_type,
+        message: activeHint.message,
+      };
+    }
+
+    if (!recorder.hasSpoken) {
+      return {
+        state: "listening" as const,
+        promptType: "recall" as const,
+        message: "Start with one sentence that captures the main idea.",
+      };
+    }
+
+    return {
+      state: "listening" as const,
+      promptType: null,
+      message:
+        recorder.elapsedSeconds > 14
+          ? "Listening. Keep building the explanation in your own order."
+          : "Listening. Start with the main idea, then build outward.",
+    };
+  }, [
+    activeHint,
+    recallHintMutation.isPending,
+    recorder.audioBlob,
+    recorder.elapsedSeconds,
+    recorder.hasSpoken,
+    recorder.isRecording,
+    recorder.silenceDurationMs,
   ]);
 
   const recorderStateLabel = useMemo(() => {
@@ -206,6 +353,14 @@ export default function StudyRecordPage() {
                     {formatElapsed(recorder.elapsedSeconds)}
                   </p>
                 </div>
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                    Silence
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                    {formatElapsed(Math.floor(recorder.silenceDurationMs / 1000))}
+                  </p>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.82))] px-4 py-4 text-sm leading-7 text-[var(--muted-foreground)]">
@@ -216,6 +371,12 @@ export default function StudyRecordPage() {
                 <p className="mt-2">
                   Treat this like a spoken retrieval drill. You are not trying to sound perfect on the first sentence, only to recover the material from memory and explain it clearly.
                 </p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-[rgba(73,102,64,0.12)]">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--primary-soft))] transition-all"
+                    style={{ width: `${Math.min(100, Math.max(6, recorder.audioLevel * 1200))}%` }}
+                  />
+                </div>
               </div>
 
               {recorder.error ? (
@@ -287,6 +448,12 @@ export default function StudyRecordPage() {
           />
         </div>
       )}
+
+      <CapybaraCoach
+        message={coach.message}
+        promptType={coach.promptType}
+        state={coach.state}
+      />
     </div>
   );
 }

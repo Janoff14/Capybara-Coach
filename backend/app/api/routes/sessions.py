@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -8,8 +8,13 @@ from app.models.document import Document
 from app.models.note import Note
 from app.models.study_session import StudySession
 from app.models.user import User
-from app.schemas.session import SessionCreate, StudySessionRead
-from app.services.ai import assess_transcript, generate_notes, transcribe_audio
+from app.schemas.session import RecallHintRead, SessionCreate, StudySessionRead
+from app.services.ai import (
+    assess_transcript,
+    generate_notes,
+    generate_recall_hint,
+    transcribe_audio,
+)
 from app.services.auth import get_current_user
 from app.services.storage import build_object_path, download_bytes, sanitize_filename, upload_bytes
 
@@ -144,6 +149,46 @@ def upload_audio(
     db.add(study_session)
     db.commit()
     return _get_session_or_404(db, session_id, current_user.id)
+
+
+@router.post("/{session_id}/recall-hint", response_model=RecallHintRead)
+def recall_hint(
+    session_id: str,
+    file: UploadFile = File(...),
+    strictness: int = Form(50),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
+) -> RecallHintRead:
+    study_session = _get_session_or_404(db, session_id, current_user.id)
+    payload = file.file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Uploaded audio is empty.")
+
+    try:
+        transcript_result = transcribe_audio(
+            filename=file.filename or "recall.webm",
+            payload=payload,
+            settings=settings,
+        )
+        transcript_text = str(transcript_result.get("text") or "").strip()
+        if not transcript_text:
+            raise HTTPException(status_code=400, detail="No speech was detected in the audio.")
+
+        hint = generate_recall_hint(
+            transcript=transcript_text,
+            source_text=study_session.document.extracted_text,
+            document_title=study_session.document.title,
+            reader_guide=study_session.document.reader_json,
+            settings=settings,
+        )
+    except HTTPException:
+        raise
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    hint["strictness"] = max(0, min(100, strictness))
+    return RecallHintRead.model_validate(hint)
 
 
 @router.post("/{session_id}/transcribe", response_model=StudySessionRead)

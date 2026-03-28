@@ -27,3 +27,11 @@ class StudySessionRead(BaseModel):
     note: NoteRead | None
     created_at: datetime
     updated_at: datetime
+
+
+class RecallHintRead(BaseModel):
+    state: str
+    prompt_type: str
+    message: str
+    missing_concepts: list[str]
+    transcript_excerpt: str

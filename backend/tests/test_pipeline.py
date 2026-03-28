@@ -164,6 +164,16 @@ class PipelineApiTests(unittest.TestCase):
                 },
             ),
             patch(
+                "app.api.routes.sessions.generate_recall_hint",
+                return_value={
+                    "state": "hint",
+                    "prompt_type": "recall",
+                    "message": "You have not defined inertia yet.",
+                    "missing_concepts": ["inertia"],
+                    "transcript_excerpt": "Objects keep moving.",
+                },
+            ),
+            patch(
                 "app.api.routes.sessions.generate_notes",
                 return_value={
                     "title": "Newton's First Law",
@@ -209,6 +219,16 @@ class PipelineApiTests(unittest.TestCase):
             )
             self.assertEqual(finish_response.status_code, 200)
             self.assertEqual(finish_response.json()["status"], "reading_complete")
+
+            hint_response = self.client.post(
+                f"/sessions/{study_session['id']}/recall-hint",
+                headers=headers,
+                files={"file": ("hint.wav", b"fake-audio", "audio/wav")},
+                data={"strictness": "50"},
+            )
+            self.assertEqual(hint_response.status_code, 200)
+            self.assertEqual(hint_response.json()["state"], "hint")
+            self.assertIn("inertia", hint_response.json()["message"])
 
             audio_response = self.client.post(
                 f"/sessions/{study_session['id']}/audio",

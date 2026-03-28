@@ -84,6 +84,14 @@ export type AssessmentJson = {
   gaps: string[];
 } & Record<string, unknown>;
 
+export type RecallHintRead = {
+  state: "hint" | "encouraging";
+  prompt_type: "recall" | "depth" | "connection";
+  message: string;
+  missing_concepts: string[];
+  transcript_excerpt: string;
+};
+
 export type StudySessionRead = {
   id: string;
   document_id: string;

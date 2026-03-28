@@ -242,6 +242,70 @@ Formatting requirements:
     }
 
 
+def generate_recall_hint(
+    *,
+    transcript: str,
+    source_text: str,
+    document_title: str,
+    reader_guide: dict[str, Any] | None,
+    settings: Settings,
+) -> dict[str, Any]:
+    fallback = _build_recall_hint_fallback(
+        transcript=transcript,
+        source_text=source_text,
+        reader_guide=reader_guide,
+    )
+
+    if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+        return fallback
+
+    prompt = f"""
+You are Capybara Coach, helping a student during live recall.
+
+Document title:
+{document_title}
+
+Study guide:
+{json.dumps(reader_guide or {}, ensure_ascii=False)[:5000]}
+
+Source:
+{source_text[:9000]}
+
+Latest spoken chunk:
+{transcript[:2500]}
+
+Return JSON only with these keys:
+- state
+- prompt_type
+- message
+- missing_concepts
+
+Rules:
+- "state" must be either "hint" or "encouraging".
+- "prompt_type" must be one of: recall, depth, connection.
+- "message" must be a short coaching bubble, max 18 words.
+- "missing_concepts" should be 0 to 3 short strings.
+- Do not dump the answer or restate the source verbatim.
+- Give a hint only if the student clearly missed or skimmed something important.
+- If the student is doing reasonably well, prefer a short encouraging nudge.
+- Sound warm, brief, and coach-like.
+"""
+
+    try:
+        content = _chat_json(
+            settings=settings,
+            system_prompt=(
+                "You are a calm live study coach. You give short, non-spammy hints"
+                " only when the learner stalls or misses an important concept."
+            ),
+            user_prompt=prompt,
+        )
+        payload = _parse_json_payload(content)
+        return _normalize_recall_hint(payload, fallback, transcript)
+    except Exception:
+        return fallback
+
+
 def _normalize_reader_guide(
     payload: dict[str, Any],
     fallback: dict[str, Any],
@@ -473,6 +537,36 @@ def _compose_note_content(
     return "\n\n".join(chunk for chunk in chunks if chunk.strip())
 
 
+def _normalize_recall_hint(
+    payload: dict[str, Any],
+    fallback: dict[str, Any],
+    transcript: str,
+) -> dict[str, Any]:
+    state = str(payload.get("state") or fallback["state"]).strip().lower()
+    if state not in {"hint", "encouraging"}:
+        state = fallback["state"]
+
+    prompt_type = str(payload.get("prompt_type") or fallback["prompt_type"]).strip().lower()
+    if prompt_type not in {"recall", "depth", "connection"}:
+        prompt_type = fallback["prompt_type"]
+
+    message = str(payload.get("message") or fallback["message"]).strip()
+    if not message:
+        message = fallback["message"]
+
+    if len(message.split()) > 18:
+        message = " ".join(message.split()[:18]).strip()
+
+    return {
+        "state": state,
+        "prompt_type": prompt_type,
+        "message": message,
+        "missing_concepts": _string_list(payload.get("missing_concepts"))[:3]
+        or fallback["missing_concepts"],
+        "transcript_excerpt": transcript.strip()[:240],
+    }
+
+
 def _build_reader_guide_fallback(source_text: str) -> dict[str, Any]:
     paragraphs = _reader_paragraphs(source_text)
     sections = _heuristic_reader_sections(paragraphs)
@@ -482,6 +576,66 @@ def _build_reader_guide_fallback(source_text: str) -> dict[str, Any]:
         "key_terms": _heuristic_key_terms(paragraphs),
         "important_sentences": all_sentences,
         "sections": sections,
+    }
+
+
+def _build_recall_hint_fallback(
+    *,
+    transcript: str,
+    source_text: str,
+    reader_guide: dict[str, Any] | None,
+) -> dict[str, Any]:
+    lowered_transcript = transcript.lower()
+    key_terms = _reader_terms((reader_guide or {}).get("key_terms"))
+    sections = _reader_sections((reader_guide or {}).get("sections"))
+    important_sentences = _string_list((reader_guide or {}).get("important_sentences"))
+
+    missing_terms = [
+        item["term"]
+        for item in key_terms
+        if item["term"].lower() not in lowered_transcript
+    ]
+    missing_sections = [
+        section["heading"]
+        for section in sections
+        if section["heading"].lower() not in lowered_transcript
+    ]
+
+    if missing_terms:
+        focus = missing_terms[0]
+        return {
+            "state": "hint",
+            "prompt_type": "recall",
+            "message": f"You have not named {focus} yet. Bring it into the explanation.",
+            "missing_concepts": missing_terms[:3],
+            "transcript_excerpt": transcript.strip()[:240],
+        }
+
+    if missing_sections:
+        focus = missing_sections[0]
+        return {
+            "state": "hint",
+            "prompt_type": "connection",
+            "message": f"Connect your explanation back to {focus}. Why does that section matter?",
+            "missing_concepts": missing_sections[:3],
+            "transcript_excerpt": transcript.strip()[:240],
+        }
+
+    if important_sentences:
+        return {
+            "state": "encouraging",
+            "prompt_type": "depth",
+            "message": "Good start. Add one layer of why it matters, not just what it says.",
+            "missing_concepts": [],
+            "transcript_excerpt": transcript.strip()[:240],
+        }
+
+    return {
+        "state": "encouraging",
+        "prompt_type": "recall",
+        "message": "Keep going. Close with the key takeaway someone should remember.",
+        "missing_concepts": _top_sentences(_reader_paragraphs(source_text), limit=2),
+        "transcript_excerpt": transcript.strip()[:240],
     }
 
 
