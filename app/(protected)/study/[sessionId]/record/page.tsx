@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileLock2, Mic, PauseCircle, PlayCircle, Sparkles, Square, Upload } from "lucide-react";
@@ -53,6 +53,7 @@ export default function StudyRecordPage() {
   const autoStartAttemptedRef = useRef(false);
   const [enteredFromReader] = useState(autoStartRequested);
   const [activeHint, setActiveHint] = useState<RecallHintRead | null>(null);
+  const [recallTranscript, setRecallTranscript] = useState("");
   const currentPauseHintedRef = useRef(false);
   const lastHintAtRef = useRef(0);
   const hintCountRef = useRef(0);
@@ -144,7 +145,7 @@ export default function StudyRecordPage() {
         type: recorder.mimeType || "audio/webm",
       });
 
-      return api.getRecallHint(token, params.sessionId, hintFile);
+      return api.getRecallHint(token, params.sessionId, hintFile, recallTranscript);
     },
     onSuccess: (hint: RecallHintRead) => {
       const nextMessage =
@@ -153,6 +154,7 @@ export default function StudyRecordPage() {
           : hint.message;
 
       lastHintMessageRef.current = nextMessage;
+      setRecallTranscript(hint.transcript_so_far);
       setActiveHint({
         ...hint,
         message: nextMessage,
@@ -165,6 +167,7 @@ export default function StudyRecordPage() {
       const fallbackHint = buildFallbackRecallHint(
         document?.title ?? "this document",
         readerGuide,
+        recallTranscript,
         hintCountRef.current,
       );
       lastHintMessageRef.current = fallbackHint.message;
@@ -174,6 +177,25 @@ export default function StudyRecordPage() {
       hintCountRef.current += 1;
     },
   });
+
+  const resetRecallState = useCallback(() => {
+    setRecallTranscript("");
+    setActiveHint(null);
+    currentPauseHintedRef.current = false;
+    hintCountRef.current = 0;
+    lastHintAtRef.current = 0;
+    lastHintMessageRef.current = "";
+  }, []);
+
+  const handleStartRecording = useCallback(() => {
+    resetRecallState();
+    void recorder.startRecording();
+  }, [recorder, resetRecallState]);
+
+  const handleResetRecall = useCallback(() => {
+    resetRecallState();
+    recorder.reset();
+  }, [recorder, resetRecallState]);
 
   useEffect(() => {
     if (!shouldAutoStart || autoStartAttemptedRef.current) {
@@ -234,6 +256,7 @@ export default function StudyRecordPage() {
     recorder.hasSpoken,
     recorder.isRecording,
     recorder.silenceDurationMs,
+    recallTranscript,
   ]);
 
   const coach = useMemo(() => {
@@ -328,6 +351,10 @@ export default function StudyRecordPage() {
   }, [recorder.audioBlob, recorder.hasSpoken, recorder.isRecording]);
 
   const quickMicLabel = recorder.isRecording ? "Tap to stop" : "Tap to start";
+  const recallWordCount = useMemo(
+    () => recallTranscript.trim().split(/\s+/).filter(Boolean).length,
+    [recallTranscript],
+  );
 
   return (
     <div className="space-y-8">
@@ -384,7 +411,7 @@ export default function StudyRecordPage() {
                           return;
                         }
 
-                        void recorder.startRecording();
+                        handleStartRecording();
                       }}
                       disabled={submitMutation.isPending}
                       className="group flex flex-col items-center gap-2 rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-white px-4 py-3 text-center shadow-[0_16px_34px_rgba(28,27,27,0.08)] transition hover:border-[rgba(73,102,64,0.22)] hover:shadow-[0_20px_40px_rgba(28,27,27,0.12)] disabled:opacity-50"
@@ -394,7 +421,7 @@ export default function StudyRecordPage() {
                           <span className="absolute inset-0 rounded-full border border-[rgba(73,102,64,0.22)] animate-ping" />
                         ) : null}
                         <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,var(--primary-soft),var(--primary))] text-white shadow-[0_12px_24px_rgba(73,102,64,0.22)]">
-                        <Mic className="size-5" />
+                          <Mic className="size-5" />
                         </div>
                       </div>
                       <div>
@@ -424,43 +451,50 @@ export default function StudyRecordPage() {
                     <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
                       {coach.state === "thinking" ? "Coach thinking" : "Coach ready"}
                     </span>
+                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                      {activeHint?.source === "ai"
+                        ? "Live analysis"
+                        : activeHint?.source === "fallback"
+                          ? "Guide fallback"
+                          : `${recallWordCount} words tracked`}
+                    </span>
                   </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                    Mode
-                  </p>
-                  <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-[var(--foreground)]">
-                    <FileLock2 className="size-4 text-[var(--primary)]" />
-                    Source hidden
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                      Mode
+                    </p>
+                    <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-[var(--foreground)]">
+                      <FileLock2 className="size-4 text-[var(--primary)]" />
+                      Source hidden
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                    State
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
-                    {recorderStateLabel}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                    Elapsed
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
-                    {formatElapsed(recorder.elapsedSeconds)}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                    Silence
-                  </p>
-                  <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
-                    {formatElapsed(Math.floor(recorder.silenceDurationMs / 1000))}
-                  </p>
-                </div>
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                      State
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                      {recorderStateLabel}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                      Elapsed
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                      {formatElapsed(recorder.elapsedSeconds)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                      Silence
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                      {formatElapsed(Math.floor(recorder.silenceDurationMs / 1000))}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -475,6 +509,11 @@ export default function StudyRecordPage() {
                 <p className="mt-3 text-sm leading-7 text-[var(--foreground)]">
                   {coach.message}
                 </p>
+                {recallTranscript ? (
+                  <p className="mt-3 text-xs uppercase tracking-[0.14em] text-[var(--muted-foreground)]">
+                    Tracking {recallWordCount} words of recall so far.
+                  </p>
+                ) : null}
                 {activeHint?.missing_concepts.length ? (
                   <div className="mt-4 flex flex-wrap gap-2">
                     {activeHint.missing_concepts.map((item) => (
@@ -499,7 +538,7 @@ export default function StudyRecordPage() {
                 <Button
                   size="lg"
                   className="min-w-[12rem]"
-                  onClick={() => void recorder.startRecording()}
+                  onClick={handleStartRecording}
                   disabled={recorder.isRecording || submitMutation.isPending}
                 >
                   <Mic className="size-4" />
@@ -519,7 +558,7 @@ export default function StudyRecordPage() {
                   size="lg"
                   variant="ghost"
                   className="min-w-[9rem]"
-                  onClick={recorder.reset}
+                  onClick={handleResetRecall}
                   disabled={recorder.isRecording || !recorder.audioBlob}
                 >
                   <PauseCircle className="size-4" />

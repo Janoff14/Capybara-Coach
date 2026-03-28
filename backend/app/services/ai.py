@@ -244,19 +244,23 @@ Formatting requirements:
 
 def generate_recall_hint(
     *,
-    transcript: str,
+    transcript_so_far: str,
+    latest_chunk: str,
     source_text: str,
     document_title: str,
     reader_guide: dict[str, Any] | None,
+    strictness: int,
     settings: Settings,
 ) -> dict[str, Any]:
     fallback = _build_recall_hint_fallback(
-        transcript=transcript,
+        transcript_so_far=transcript_so_far,
+        latest_chunk=latest_chunk,
         source_text=source_text,
         reader_guide=reader_guide,
     )
 
     if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+        fallback["debug_reason"] = "azure_not_configured"
         return fallback
 
     prompt = f"""
@@ -271,8 +275,14 @@ Study guide:
 Source:
 {source_text[:9000]}
 
+Student recall so far:
+{transcript_so_far[:7000]}
+
 Latest spoken chunk:
-{transcript[:2500]}
+{latest_chunk[:2500] or "[No new chunk detected]"}
+
+Strictness:
+{max(0, min(100, strictness))}/100
 
 Return JSON only with these keys:
 - state
@@ -286,8 +296,11 @@ Rules:
 - "message" must be a short coaching bubble, max 18 words.
 - "missing_concepts" should be 0 to 3 short strings.
 - Do not dump the answer or restate the source verbatim.
-- Give a hint only if the student clearly missed or skimmed something important.
+- Base the hint on the cumulative recall so far, not only the latest chunk.
+- Do not ask for concepts the student has already covered reasonably well.
+- Give a hint only if the student clearly missed, skimmed, or weakly connected something important.
 - If the student is doing reasonably well, prefer a short encouraging nudge.
+- At low strictness, accept rough but correct understanding. At high strictness, push for missing precision.
 - Sound warm, brief, and coach-like.
 """
 
@@ -301,9 +314,34 @@ Rules:
             user_prompt=prompt,
         )
         payload = _parse_json_payload(content)
-        return _normalize_recall_hint(payload, fallback, transcript)
+        return _normalize_recall_hint(payload, fallback, transcript_so_far, latest_chunk)
     except Exception:
+        fallback["debug_reason"] = "ai_hint_generation_failed"
         return fallback
+
+
+def merge_recall_transcript(cumulative_transcript: str, latest_chunk: str) -> str:
+    cumulative = _normalize_whitespace(cumulative_transcript)
+    latest = _normalize_whitespace(latest_chunk)
+
+    if not cumulative:
+        return latest
+
+    if not latest:
+        return cumulative
+
+    cumulative_lower = cumulative.lower()
+    latest_lower = latest.lower()
+
+    if latest_lower in cumulative_lower:
+        return cumulative
+
+    max_overlap = min(len(cumulative_lower), len(latest_lower), 240)
+    for overlap in range(max_overlap, 23, -1):
+        if cumulative_lower.endswith(latest_lower[:overlap]):
+            return _normalize_whitespace(f"{cumulative}{latest[overlap:]}")
+
+    return _normalize_whitespace(f"{cumulative} {latest}")
 
 
 def _normalize_reader_guide(
@@ -540,7 +578,8 @@ def _compose_note_content(
 def _normalize_recall_hint(
     payload: dict[str, Any],
     fallback: dict[str, Any],
-    transcript: str,
+    transcript_so_far: str,
+    latest_chunk: str,
 ) -> dict[str, Any]:
     state = str(payload.get("state") or fallback["state"]).strip().lower()
     if state not in {"hint", "encouraging"}:
@@ -563,7 +602,10 @@ def _normalize_recall_hint(
         "message": message,
         "missing_concepts": _string_list(payload.get("missing_concepts"))[:3]
         or fallback["missing_concepts"],
-        "transcript_excerpt": transcript.strip()[:240],
+        "transcript_excerpt": latest_chunk.strip()[:240],
+        "transcript_so_far": transcript_so_far.strip()[:6000],
+        "source": "ai",
+        "debug_reason": None,
     }
 
 
@@ -581,11 +623,12 @@ def _build_reader_guide_fallback(source_text: str) -> dict[str, Any]:
 
 def _build_recall_hint_fallback(
     *,
-    transcript: str,
+    transcript_so_far: str,
+    latest_chunk: str,
     source_text: str,
     reader_guide: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    lowered_transcript = transcript.lower()
+    lowered_transcript = transcript_so_far.lower()
     key_terms = _reader_terms((reader_guide or {}).get("key_terms"))
     sections = _reader_sections((reader_guide or {}).get("sections"))
     important_sentences = _string_list((reader_guide or {}).get("important_sentences"))
@@ -608,7 +651,10 @@ def _build_recall_hint_fallback(
             "prompt_type": "recall",
             "message": f"You have not named {focus} yet. Bring it into the explanation.",
             "missing_concepts": missing_terms[:3],
-            "transcript_excerpt": transcript.strip()[:240],
+            "transcript_excerpt": latest_chunk.strip()[:240],
+            "transcript_so_far": transcript_so_far.strip()[:6000],
+            "source": "fallback",
+            "debug_reason": None,
         }
 
     if missing_sections:
@@ -618,7 +664,10 @@ def _build_recall_hint_fallback(
             "prompt_type": "connection",
             "message": f"Connect your explanation back to {focus}. Why does that section matter?",
             "missing_concepts": missing_sections[:3],
-            "transcript_excerpt": transcript.strip()[:240],
+            "transcript_excerpt": latest_chunk.strip()[:240],
+            "transcript_so_far": transcript_so_far.strip()[:6000],
+            "source": "fallback",
+            "debug_reason": None,
         }
 
     if important_sentences:
@@ -627,7 +676,10 @@ def _build_recall_hint_fallback(
             "prompt_type": "depth",
             "message": "Good start. Add one layer of why it matters, not just what it says.",
             "missing_concepts": [],
-            "transcript_excerpt": transcript.strip()[:240],
+            "transcript_excerpt": latest_chunk.strip()[:240],
+            "transcript_so_far": transcript_so_far.strip()[:6000],
+            "source": "fallback",
+            "debug_reason": None,
         }
 
     return {
@@ -635,7 +687,10 @@ def _build_recall_hint_fallback(
         "prompt_type": "recall",
         "message": "Keep going. Close with the key takeaway someone should remember.",
         "missing_concepts": _top_sentences(_reader_paragraphs(source_text), limit=2),
-        "transcript_excerpt": transcript.strip()[:240],
+        "transcript_excerpt": latest_chunk.strip()[:240],
+        "transcript_so_far": transcript_so_far.strip()[:6000],
+        "source": "fallback",
+        "debug_reason": None,
     }
 
 
@@ -744,3 +799,7 @@ def _top_sentences(paragraphs: list[str], limit: int) -> list[str]:
 def _split_sentences(value: str) -> list[str]:
     parts = re.split(r"(?<=[.!?])\s+", value.strip())
     return [part.strip() for part in parts if part.strip()]
+
+
+def _normalize_whitespace(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()

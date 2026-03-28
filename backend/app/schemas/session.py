@@ -35,3 +35,6 @@ class RecallHintRead(BaseModel):
     message: str
     missing_concepts: list[str]
     transcript_excerpt: str
+    transcript_so_far: str
+    source: str
+    debug_reason: str | None = None

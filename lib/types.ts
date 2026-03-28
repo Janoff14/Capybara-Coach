@@ -90,6 +90,9 @@ export type RecallHintRead = {
   message: string;
   missing_concepts: string[];
   transcript_excerpt: string;
+  transcript_so_far: string;
+  source: "ai" | "fallback";
+  debug_reason?: string | null;
 };
 
 export type StudySessionRead = {

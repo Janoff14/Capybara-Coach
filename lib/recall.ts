@@ -76,32 +76,46 @@ export function buildRecallChecklist(guide: ReaderGuideView) {
 export function buildFallbackRecallHint(
   documentTitle: string,
   guide: ReaderGuideView,
+  transcriptSoFar: string,
   hintIndex: number,
 ): RecallHintRead {
   const safeTitle = documentTitle.trim() || "this document";
+  const loweredTranscript = transcriptSoFar.toLowerCase();
   const keyTerms = guide.keyTerms;
   const sections = guide.sections;
   const prompts = buildRecallPrompts(safeTitle, guide);
+  const missingKeyTerms = keyTerms.filter(
+    (item) => !loweredTranscript.includes(item.term.toLowerCase()),
+  );
+  const missingSections = sections.filter(
+    (section) => !loweredTranscript.includes(section.title.toLowerCase()),
+  );
 
-  if (keyTerms.length > 0) {
-    const term = keyTerms[hintIndex % keyTerms.length];
+  if (missingKeyTerms.length > 0) {
+    const term = missingKeyTerms[hintIndex % missingKeyTerms.length];
     return {
       state: "hint",
       prompt_type: "recall",
       message: `Define "${term.term}" clearly before you continue.`,
       missing_concepts: [term.term],
       transcript_excerpt: "",
+      transcript_so_far: transcriptSoFar,
+      source: "fallback",
+      debug_reason: "frontend_hint_request_failed",
     };
   }
 
-  if (sections.length > 0) {
-    const section = sections[hintIndex % sections.length];
+  if (missingSections.length > 0) {
+    const section = missingSections[hintIndex % missingSections.length];
     return {
       state: "hint",
       prompt_type: "connection",
       message: `Come back to "${section.title}" and explain why it matters.`,
       missing_concepts: [section.title],
       transcript_excerpt: "",
+      transcript_so_far: transcriptSoFar,
+      source: "fallback",
+      debug_reason: "frontend_hint_request_failed",
     };
   }
 
@@ -112,5 +126,8 @@ export function buildFallbackRecallHint(
     message: prompt?.prompt || `Return to the main idea behind ${safeTitle}.`,
     missing_concepts: [],
     transcript_excerpt: "",
+    transcript_so_far: transcriptSoFar,
+    source: "fallback",
+    debug_reason: "frontend_hint_request_failed",
   };
 }

@@ -171,8 +171,11 @@ class PipelineApiTests(unittest.TestCase):
                     "message": "You have not defined inertia yet.",
                     "missing_concepts": ["inertia"],
                     "transcript_excerpt": "Objects keep moving.",
+                    "transcript_so_far": "Objects keep moving. A force changes motion.",
+                    "source": "ai",
+                    "debug_reason": None,
                 },
-            ),
+            ) as generate_recall_hint_mock,
             patch(
                 "app.api.routes.sessions.generate_notes",
                 return_value={
@@ -224,11 +227,17 @@ class PipelineApiTests(unittest.TestCase):
                 f"/sessions/{study_session['id']}/recall-hint",
                 headers=headers,
                 files={"file": ("hint.wav", b"fake-audio", "audio/wav")},
-                data={"strictness": "50"},
+                data={"strictness": "50", "cumulative_transcript": "Objects keep moving."},
             )
             self.assertEqual(hint_response.status_code, 200)
             self.assertEqual(hint_response.json()["state"], "hint")
             self.assertIn("inertia", hint_response.json()["message"])
+            self.assertEqual(hint_response.json()["source"], "ai")
+            self.assertIn("A force changes motion", hint_response.json()["transcript_so_far"])
+            self.assertIn(
+                "Objects keep moving. An object keeps its state of motion unless a force changes it.",
+                generate_recall_hint_mock.call_args.kwargs["transcript_so_far"],
+            )
 
             audio_response = self.client.post(
                 f"/sessions/{study_session['id']}/audio",

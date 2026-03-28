@@ -208,9 +208,16 @@ export const api = {
     });
   },
 
-  getRecallHint(token: string, sessionId: string, file: File, strictness = 50) {
+  getRecallHint(
+    token: string,
+    sessionId: string,
+    file: File,
+    cumulativeTranscript = "",
+    strictness = 50,
+  ) {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("cumulative_transcript", cumulativeTranscript);
     formData.append("strictness", String(strictness));
 
     return request<RecallHintRead>(`/sessions/${sessionId}/recall-hint`, {

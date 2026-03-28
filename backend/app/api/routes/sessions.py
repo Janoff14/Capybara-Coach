@@ -13,6 +13,7 @@ from app.services.ai import (
     assess_transcript,
     generate_notes,
     generate_recall_hint,
+    merge_recall_transcript,
     transcribe_audio,
 )
 from app.services.auth import get_current_user
@@ -155,6 +156,7 @@ def upload_audio(
 def recall_hint(
     session_id: str,
     file: UploadFile = File(...),
+    cumulative_transcript: str = Form(""),
     strictness: int = Form(50),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -165,6 +167,8 @@ def recall_hint(
     if not payload:
         raise HTTPException(status_code=400, detail="Uploaded audio is empty.")
 
+    transcript_text = ""
+
     try:
         transcript_result = transcribe_audio(
             filename=file.filename or "recall.webm",
@@ -172,22 +176,24 @@ def recall_hint(
             settings=settings,
         )
         transcript_text = str(transcript_result.get("text") or "").strip()
-        if not transcript_text:
-            raise HTTPException(status_code=400, detail="No speech was detected in the audio.")
+    except RuntimeError:
+        if not cumulative_transcript.strip():
+            raise
 
-        hint = generate_recall_hint(
-            transcript=transcript_text,
-            source_text=study_session.document.extracted_text,
-            document_title=study_session.document.title,
-            reader_guide=study_session.document.reader_json,
-            settings=settings,
-        )
-    except HTTPException:
-        raise
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    transcript_so_far = merge_recall_transcript(cumulative_transcript, transcript_text)
+    if not transcript_so_far:
+        raise HTTPException(status_code=400, detail="No speech was detected in the audio.")
 
-    hint["strictness"] = max(0, min(100, strictness))
+    hint = generate_recall_hint(
+        transcript_so_far=transcript_so_far,
+        latest_chunk=transcript_text,
+        source_text=study_session.document.extracted_text,
+        document_title=study_session.document.title,
+        reader_guide=study_session.document.reader_json,
+        strictness=strictness,
+        settings=settings,
+    )
+
     return RecallHintRead.model_validate(hint)
 
 
