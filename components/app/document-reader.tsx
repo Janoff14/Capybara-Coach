@@ -1,27 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Expand, Eye, EyeOff, Lightbulb, Minimize2 } from "lucide-react";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
 import {
-  resolveSentenceHighlight,
-  splitParagraphIntoSentences,
-  type ReaderSection,
-} from "@/lib/document-reader";
-import type { ReaderHighlightType } from "@/lib/types";
+  BookOpenText,
+  Expand,
+  Eye,
+  EyeOff,
+  Highlighter,
+  Lightbulb,
+  Minimize2,
+} from "lucide-react";
+
+import type { ReaderSection } from "@/lib/document-reader";
+import type { ReaderHighlightType, ReaderKeyTerm } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
+
 type DocumentReaderProps = {
+  blob: Blob | null;
+  error: string | null;
+  importantSentences: string[];
   isLoading: boolean;
-  title: string;
+  keyTerms: ReaderKeyTerm[];
   sections: ReaderSection[];
+  title: string;
 };
 
 export function DocumentReader({
+  blob,
+  error,
+  importantSentences,
   isLoading,
-  title,
+  keyTerms,
   sections,
+  title,
 }: DocumentReaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHighlights, setShowHighlights] = useState(true);
@@ -50,16 +71,20 @@ export function DocumentReader({
 
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-[rgba(28,27,27,0.42)] p-4 backdrop-blur-sm md:p-6">
-        <div className="mx-auto h-full max-w-6xl">
+      <div className="fixed inset-0 z-50 bg-[rgba(28,27,27,0.45)] p-4 backdrop-blur-sm md:p-6">
+        <div className="mx-auto h-full max-w-7xl">
           <ReaderSurface
-            title={title}
-            sections={sections}
-            isLoading={isLoading}
+            blob={blob}
+            error={error}
+            importantSentences={importantSentences}
             isFullscreen
-            showHighlights={showHighlights}
+            isLoading={isLoading}
+            keyTerms={keyTerms}
             onToggleFullscreen={() => setIsFullscreen(false)}
             onToggleHighlights={() => setShowHighlights((value) => !value)}
+            sections={sections}
+            showHighlights={showHighlights}
+            title={title}
           />
         </div>
       </div>
@@ -68,42 +93,81 @@ export function DocumentReader({
 
   return (
     <ReaderSurface
-      title={title}
-      sections={sections}
-      isLoading={isLoading}
+      blob={blob}
+      error={error}
+      importantSentences={importantSentences}
       isFullscreen={false}
-      showHighlights={showHighlights}
+      isLoading={isLoading}
+      keyTerms={keyTerms}
       onToggleFullscreen={() => setIsFullscreen(true)}
       onToggleHighlights={() => setShowHighlights((value) => !value)}
+      sections={sections}
+      showHighlights={showHighlights}
+      title={title}
     />
   );
 }
 
 function ReaderSurface({
+  blob,
+  error,
+  importantSentences,
   isFullscreen,
   isLoading,
+  keyTerms,
   onToggleFullscreen,
   onToggleHighlights,
   sections,
   showHighlights,
   title,
-}: {
+}: DocumentReaderProps & {
   isFullscreen: boolean;
-  isLoading: boolean;
   onToggleFullscreen: () => void;
   onToggleHighlights: () => void;
-  sections: ReaderSection[];
   showHighlights: boolean;
-  title: string;
 }) {
+  const [numPages, setNumPages] = useState(0);
+  const [pageWidth, setPageWidth] = useState(760);
+  const viewerRef = useRef<HTMLDivElement | null>(null);
+  const blobUrl = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobUrl]);
+
+  useEffect(() => {
+    const node = viewerRef.current;
+    if (!node) {
+      return;
+    }
+
+    const updateWidth = () => {
+      const nextWidth = Math.max(
+        320,
+        Math.min(node.clientWidth - 48, isFullscreen ? 980 : 820),
+      );
+      setPageWidth(nextWidth);
+    };
+
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [isFullscreen]);
+
   return (
-    <Card className={isFullscreen ? "flex h-full flex-col overflow-hidden" : "h-full"}>
+    <Card className={isFullscreen ? "flex h-full flex-col overflow-hidden" : "overflow-hidden"}>
       <CardHeader className="border-b border-[var(--border-soft)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <CardTitle>{title}</CardTitle>
             <CardDescription>
-              Read in a cleaner study view with calmer spacing, stronger hierarchy, and fewer PDF-style distractions.
+              Read the original PDF with its visual structure intact, while the study guidance stays alongside it instead of flattening the document.
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -111,12 +175,12 @@ function ReaderSurface({
               {showHighlights ? (
                 <>
                   <EyeOff className="size-4" />
-                  Hide highlights
+                  Hide guide
                 </>
               ) : (
                 <>
                   <Eye className="size-4" />
-                  Show highlights
+                  Show guide
                 </>
               )}
             </Button>
@@ -135,99 +199,177 @@ function ReaderSurface({
             </Button>
           </div>
         </div>
-        {showHighlights ? (
-          <div className="mt-5 flex flex-wrap gap-2">
-            <LegendPill type="key_idea" label="Key idea" />
-            <LegendPill type="definition" label="Definition" />
-            <LegendPill type="example" label="Example" />
-          </div>
-        ) : null}
       </CardHeader>
       <CardContent className={isFullscreen ? "flex-1 overflow-hidden p-0" : "p-0"}>
         {isLoading ? (
-          <div className="flex h-[72vh] items-center justify-center rounded-b-[28px] bg-[var(--panel-soft)] text-[var(--muted-foreground)]">
+          <div className="flex h-[74vh] items-center justify-center bg-[var(--panel-soft)] text-[var(--muted-foreground)]">
             Preparing your reading view...
           </div>
-        ) : sections.length === 0 ? (
-          <div className="flex h-[72vh] items-center justify-center rounded-b-[28px] bg-[var(--panel-soft)] px-6 text-center text-[var(--muted-foreground)]">
-            This upload does not have extracted text yet, so the reader cannot be rendered.
+        ) : error ? (
+          <div className="flex h-[74vh] items-center justify-center bg-rose-500/10 px-6 text-center text-sm text-rose-100">
+            {error}
+          </div>
+        ) : !blobUrl ? (
+          <div className="flex h-[74vh] items-center justify-center bg-[var(--panel-soft)] px-6 text-center text-[var(--muted-foreground)]">
+            The original PDF could not be loaded for this document.
           </div>
         ) : (
-          <div className="h-[72vh] overflow-y-auto bg-[linear-gradient(180deg,rgba(252,249,242,0.96),rgba(247,243,235,0.94))]">
-            <div className="mx-auto flex max-w-3xl flex-col gap-14 px-6 py-8 md:px-10 md:py-10">
-              {sections.map((section) => (
-                <article key={section.id} className="space-y-6" id={section.id}>
-                  <div className="space-y-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
-                      {section.label}
-                    </p>
-                    <h2 className="font-display text-[2rem] font-bold tracking-[-0.05em] text-[var(--foreground)] md:text-[2.35rem]">
-                      {section.title}
-                    </h2>
-                  </div>
+          <div className={isFullscreen ? "grid h-full lg:grid-cols-[minmax(0,1fr)_23rem]" : "grid min-h-[74vh] lg:grid-cols-[minmax(0,1fr)_23rem]"}>
+            <div ref={viewerRef} className="overflow-y-auto bg-[linear-gradient(180deg,rgba(248,245,238,0.98),rgba(242,238,228,0.95))]">
+              <div className="mx-auto flex max-w-[960px] flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
+                <div className="rounded-[22px] border border-[var(--border-soft)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_14px_35px_rgba(28,27,27,0.08)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
+                    Reader mode
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+                    This view keeps the PDF layout, hierarchy, footnotes, and visual rhythm intact so you are studying the actual document, not a flattened transcription.
+                  </p>
+                  <p className="mt-3 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                    {numPages > 0 ? `${numPages} pages loaded` : "Loading pages"}
+                  </p>
+                </div>
 
-                  {showHighlights && section.highlights.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {section.highlights.map((highlight, index) => (
-                        <span
-                          key={`${section.id}-highlight-${index}`}
-                          className={highlightBadgeClass(highlight.type)}
-                        >
-                          {highlightLabel(highlight.type)}
-                        </span>
-                      ))}
+                <Document
+                  file={blobUrl}
+                  loading={
+                    <div className="rounded-[24px] border border-[var(--border-soft)] bg-white px-6 py-10 text-center text-[var(--muted-foreground)] shadow-[0_18px_40px_rgba(28,27,27,0.08)]">
+                      Rendering PDF pages...
                     </div>
-                  ) : null}
-
-                  <div className="space-y-6">
-                    {section.paragraphs.map((paragraph, index) => (
-                      <p
-                        key={`${section.id}-${index}`}
-                        className="text-[1.02rem] leading-9 text-[rgba(52,52,47,0.92)] md:text-[1.08rem]"
-                      >
-                        {splitParagraphIntoSentences(paragraph).map((sentence, sentenceIndex, all) => {
-                          const highlightType = showHighlights
-                            ? resolveSentenceHighlight(sentence, section.highlights)
-                            : null;
-
-                          return (
-                            <span
-                              key={`${section.id}-${index}-${sentenceIndex}`}
-                              className={highlightType ? highlightSentenceClass(highlightType) : undefined}
-                            >
-                              {sentence}
-                              {sentenceIndex < all.length - 1 ? " " : ""}
-                            </span>
-                          );
-                        })}
-                      </p>
-                    ))}
-                  </div>
-
-                  {section.summaryBullets.length > 0 ? (
-                    <div className="rounded-[22px] border border-[rgba(194,200,190,0.42)] bg-[rgba(133,165,121,0.08)] p-5">
-                      <div className="flex items-center gap-2">
-                        <Lightbulb className="size-4 text-[var(--primary)]" />
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
-                          Section summary
-                        </p>
+                  }
+                  onLoadSuccess={({ numPages: loadedPages }) => setNumPages(loadedPages)}
+                  error={
+                    <div className="rounded-[24px] border border-rose-400/20 bg-rose-500/10 px-6 py-10 text-center text-sm text-rose-100">
+                      The PDF renderer could not display this document.
+                    </div>
+                  }
+                >
+                  {Array.from({ length: numPages || 0 }, (_, index) => (
+                    <div
+                      key={`page-${index + 1}`}
+                      className="rounded-[26px] border border-[var(--border-soft)] bg-white p-3 shadow-[0_18px_40px_rgba(28,27,27,0.08)]"
+                    >
+                      <div className="mb-3 flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                        <span>Page {index + 1}</span>
+                        <span>{title}</span>
                       </div>
-                      <ul className="mt-4 space-y-3">
-                        {section.summaryBullets.map((item) => (
-                          <li
-                            key={`${section.id}-summary-${item.slice(0, 32)}`}
-                            className="flex items-start gap-3 text-sm leading-7 text-[var(--muted-foreground)]"
-                          >
-                            <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="overflow-hidden rounded-[18px] border border-[rgba(28,27,27,0.06)] bg-white">
+                        <Page
+                          pageNumber={index + 1}
+                          width={pageWidth}
+                          renderAnnotationLayer
+                          renderTextLayer
+                        />
+                      </div>
                     </div>
-                  ) : null}
-                </article>
-              ))}
+                  ))}
+                </Document>
+              </div>
             </div>
+
+            <aside className="overflow-y-auto border-t border-[var(--border-soft)] bg-[linear-gradient(180deg,rgba(250,248,242,0.92),rgba(243,239,229,0.94))] lg:border-l lg:border-t-0">
+              <div className="space-y-4 px-4 py-5">
+                <Card className="border-[rgba(194,200,190,0.42)] bg-[rgba(255,255,255,0.72)]">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Reading guide</CardTitle>
+                    <CardDescription>
+                      Keep this visible while reading, or hide it when you want the PDF entirely on its own.
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+
+                {showHighlights ? (
+                  <>
+                    {importantSentences.length > 0 ? (
+                      <GuideCard
+                        description="The main line of thought to keep in mind while reading."
+                        icon={<Highlighter className="size-4 text-[var(--primary)]" />}
+                        title="Focus sentence"
+                      >
+                        <p className="text-sm leading-7 text-[var(--muted-foreground)]">
+                          {importantSentences[0]}
+                        </p>
+                      </GuideCard>
+                    ) : null}
+
+                    {sections.length > 0 ? (
+                      <GuideCard
+                        description="Contextual guidance that stays tied to the study purpose instead of trying to repaint the PDF text."
+                        icon={<Lightbulb className="size-4 text-[var(--primary)]" />}
+                        title="Section cues"
+                      >
+                        <div className="space-y-4">
+                          {sections.map((section) => (
+                            <div
+                              key={`${section.id}-guide`}
+                              className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4"
+                            >
+                              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
+                                {section.label}
+                              </p>
+                              <p className="mt-2 font-display text-xl font-bold tracking-[-0.04em] text-[var(--foreground)]">
+                                {section.title}
+                              </p>
+                              {section.highlights.length > 0 ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {uniqueHighlightTypes(section.highlights).map((type) => (
+                                    <span key={`${section.id}-${type}`} className={highlightBadgeClass(type)}>
+                                      {highlightLabel(type)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {section.summaryBullets.length > 0 ? (
+                                <ul className="mt-4 space-y-2">
+                                  {section.summaryBullets.map((item) => (
+                                    <li
+                                      key={`${section.id}-summary-${item.slice(0, 32)}`}
+                                      className="flex items-start gap-3 text-sm leading-7 text-[var(--muted-foreground)]"
+                                    >
+                                      <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
+                                      <span>{item}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </GuideCard>
+                    ) : null}
+
+                    {keyTerms.length > 0 ? (
+                      <GuideCard
+                        description="Definitions and high-signal concepts that are worth keeping precise."
+                        icon={<BookOpenText className="size-4 text-[var(--primary)]" />}
+                        title="Key terms"
+                      >
+                        <div className="space-y-3">
+                          {keyTerms.map((item) => (
+                            <div
+                              key={item.term}
+                              className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4"
+                            >
+                              <p className="font-display text-lg font-bold tracking-[-0.04em] text-[var(--foreground)]">
+                                {item.term}
+                              </p>
+                              <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+                                {item.definition}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </GuideCard>
+                    ) : null}
+                  </>
+                ) : (
+                  <Card className="border-[var(--border-soft)] bg-[rgba(255,255,255,0.72)]">
+                    <CardContent className="px-5 py-5 text-sm leading-7 text-[var(--muted-foreground)]">
+                      Guidance is hidden right now, so you can read the PDF without any coaching layer in the way.
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </aside>
           </div>
         )}
       </CardContent>
@@ -235,14 +377,29 @@ function ReaderSurface({
   );
 }
 
-function LegendPill({
-  label,
-  type,
+function GuideCard({
+  children,
+  description,
+  icon,
+  title,
 }: {
-  label: string;
-  type: ReaderHighlightType;
+  children: ReactNode;
+  description: string;
+  icon: ReactNode;
+  title: string;
 }) {
-  return <span className={highlightBadgeClass(type)}>{label}</span>;
+  return (
+    <Card className="border-[rgba(194,200,190,0.42)] bg-[rgba(255,255,255,0.72)]">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          {icon}
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </div>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
 }
 
 function highlightLabel(type: ReaderHighlightType) {
@@ -272,17 +429,6 @@ function highlightBadgeClass(type: ReaderHighlightType) {
   return `${shared} border-amber-300/60 bg-amber-300/18 text-amber-900`;
 }
 
-function highlightSentenceClass(type: ReaderHighlightType) {
-  const shared =
-    "rounded-md px-1.5 py-0.5 transition-colors";
-
-  if (type === "definition") {
-    return `${shared} bg-sky-200/65 text-slate-900`;
-  }
-
-  if (type === "example") {
-    return `${shared} bg-emerald-200/65 text-slate-900`;
-  }
-
-  return `${shared} bg-amber-200/70 text-slate-900`;
+function uniqueHighlightTypes(highlights: ReaderSection["highlights"]) {
+  return Array.from(new Set(highlights.map((highlight) => highlight.type)));
 }

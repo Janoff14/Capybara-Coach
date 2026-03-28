@@ -139,6 +139,8 @@ Rules:
   - type (key_idea, definition, example)
   - text
 - Keep everything concise, readable, and useful for active studying.
+- Prefer central concepts, mechanisms, and explanatory examples over isolated names, citations, dates, or footnotes.
+- Do not highlight a sentence unless it would still matter to a student during recall.
 """
 
     try:
