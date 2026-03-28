@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Target,
+  PanelsTopLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -240,6 +241,35 @@ export default function AssessmentPage() {
     },
   });
 
+  const flashcardsQuery = useQuery({
+    queryKey: ["flashcards", params.sessionId],
+    enabled: Boolean(token && params.sessionId),
+    queryFn: () => api.getFlashcards(token!, params.sessionId),
+  });
+
+  const generateFlashcardsMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) {
+        throw new Error("You need to be logged in to generate flashcards.");
+      }
+
+      return api.generateFlashcards(token, params.sessionId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["flashcards"] });
+      await queryClient.invalidateQueries({ queryKey: ["flashcards", params.sessionId] });
+      toast.success("Flashcards generated.");
+      router.push(`/practice?sessionId=${params.sessionId}`);
+    },
+    onError: (error) => {
+      const message =
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Could not generate flashcards.";
+      toast.error(message);
+    },
+  });
+
   const session = sessionQuery.data;
   const assessment = session?.assessment_json;
   const document = documentQuery.data;
@@ -262,6 +292,7 @@ export default function AssessmentPage() {
   const strictness = strictnessOverride ?? appliedStrictness;
   const strictnessProfile = getStrictnessProfile(strictness);
   const canOpenNotes = Boolean(session?.note);
+  const hasFlashcards = (flashcardsQuery.data?.length ?? 0) > 0;
   const hasStrictnessChanged = strictness !== appliedStrictness;
 
   return (
@@ -423,6 +454,23 @@ export default function AssessmentPage() {
                   disabled={generateNotesMutation.isPending}
                 >
                   {generateNotesMutation.isPending ? "Generating notes..." : "Generate notes"}
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={() =>
+                    hasFlashcards
+                      ? router.push(`/practice?sessionId=${params.sessionId}`)
+                      : generateFlashcardsMutation.mutate()
+                  }
+                  disabled={generateFlashcardsMutation.isPending}
+                >
+                  <PanelsTopLeft className="size-4" />
+                  {generateFlashcardsMutation.isPending
+                    ? "Building flashcards..."
+                    : hasFlashcards
+                      ? "Open practice deck"
+                      : "Generate flashcards"}
                 </Button>
                 {canOpenNotes ? (
                   <Button

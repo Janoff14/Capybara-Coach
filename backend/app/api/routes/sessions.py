@@ -5,13 +5,16 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.models.document import Document
+from app.models.flashcard import Flashcard
 from app.models.note import Note
 from app.models.study_session import StudySession
 from app.models.user import User
+from app.schemas.flashcard import FlashcardRead
 from app.schemas.session import RecallHintRead, SessionCreate, StudySessionRead
 from app.services.ai import (
     ASSESSMENT_PROTOCOL_VERSION,
     assess_transcript,
+    generate_flashcards,
     generate_notes,
     generate_recall_hint,
     merge_recall_transcript,
@@ -327,3 +330,73 @@ def create_notes(
     db.add(study_session)
     db.commit()
     return _get_session_or_404(db, session_id, current_user.id)
+
+
+@router.post("/{session_id}/flashcards", response_model=list[FlashcardRead])
+def create_flashcards(
+    session_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
+) -> list[FlashcardRead]:
+    study_session = _get_session_or_404(db, session_id, current_user.id)
+    if study_session.assessment_json is None or not study_session.transcript_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Assess the session before generating flashcards.",
+        )
+
+    if study_session.flashcards:
+        return [_serialize_flashcard(card) for card in study_session.flashcards]
+
+    try:
+        flashcards_payload = generate_flashcards(
+            transcript=study_session.transcript_text,
+            source_text=study_session.document.extracted_text,
+            assessment=study_session.assessment_json,
+            document_title=study_session.document.title,
+            note_payload=study_session.note.note_json if study_session.note else None,
+            settings=settings,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    created_cards: list[Flashcard] = []
+    for index, payload in enumerate(flashcards_payload):
+        card = Flashcard(
+            user_id=study_session.user_id,
+            study_session_id=study_session.id,
+            note_id=study_session.note.id if study_session.note else None,
+            order_index=index,
+            question=str(payload.get("question") or "").strip(),
+            answer=str(payload.get("answer") or "").strip(),
+            cue=str(payload.get("cue") or "").strip() or None,
+            card_type=str(payload.get("card_type") or "concept").strip() or "concept",
+            source_focus=str(payload.get("source_focus") or "").strip() or None,
+            flashcard_json=payload,
+        )
+        db.add(card)
+        created_cards.append(card)
+
+    db.commit()
+    return [_serialize_flashcard(card) for card in created_cards]
+
+
+def _serialize_flashcard(card: Flashcard) -> FlashcardRead:
+    return FlashcardRead.model_validate(
+        {
+            "id": card.id,
+            "study_session_id": card.study_session_id,
+            "note_id": card.note_id,
+            "document_id": card.study_session.document_id,
+            "document_title": card.study_session.document.title,
+            "order_index": card.order_index,
+            "question": card.question,
+            "answer": card.answer,
+            "cue": card.cue,
+            "card_type": card.card_type,
+            "source_focus": card.source_focus,
+            "created_at": card.created_at,
+            "updated_at": card.updated_at,
+        }
+    )

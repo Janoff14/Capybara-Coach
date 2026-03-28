@@ -1,6 +1,7 @@
 import type {
   AuthUser,
   DocumentRead,
+  FlashcardRead,
   LoginInput,
   NoteRead,
   RecallHintRead,
@@ -257,5 +258,17 @@ export const api = {
 
   getNote(noteId: string, token: string) {
     return request<NoteRead>(`/notes/${noteId}`, { token });
+  },
+
+  getFlashcards(token: string, sessionId?: string) {
+    const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+    return request<FlashcardRead[]>(`/flashcards${query}`, { token });
+  },
+
+  generateFlashcards(token: string, sessionId: string) {
+    return request<FlashcardRead[]>(`/sessions/${sessionId}/flashcards`, {
+      method: "POST",
+      token,
+    });
   },
 };

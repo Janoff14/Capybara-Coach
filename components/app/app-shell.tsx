@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpenText, LayoutDashboard, LogOut, NotebookPen } from "lucide-react";
+import { BookOpenText, LayoutDashboard, LogOut, NotebookPen, PanelsTopLeft } from "lucide-react";
 
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/documents", label: "Documents", icon: BookOpenText },
+  { href: "/practice", label: "Practice", icon: PanelsTopLeft },
   { href: "/notes", label: "Notes", icon: NotebookPen },
 ];
 

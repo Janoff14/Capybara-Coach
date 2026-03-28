@@ -44,3 +44,7 @@ class StudySession(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    flashcards: Mapped[list["Flashcard"]] = relationship(
+        back_populates="study_session",
+        cascade="all, delete-orphan",
+    )

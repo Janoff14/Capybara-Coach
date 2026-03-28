@@ -33,3 +33,4 @@ class Note(Base):
 
     study_session: Mapped["StudySession"] = relationship(back_populates="note")
     user: Mapped["User"] = relationship(back_populates="notes")
+    flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="note")

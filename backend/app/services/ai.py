@@ -328,6 +328,80 @@ Formatting requirements:
     }
 
 
+def generate_flashcards(
+    *,
+    transcript: str,
+    source_text: str,
+    assessment: dict[str, Any],
+    document_title: str,
+    note_payload: dict[str, Any] | None,
+    settings: Settings,
+) -> list[dict[str, Any]]:
+    fallback = _build_flashcards_fallback(
+        document_title=document_title,
+        source_text=source_text,
+        assessment=assessment,
+        note_payload=note_payload,
+    )
+
+    if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+        return fallback
+
+    prompt = f"""
+Create a compact study flashcard deck from this recall session.
+
+Document title:
+{document_title}
+
+Source:
+{source_text[:12000]}
+
+Transcript:
+{transcript[:7000]}
+
+Assessment:
+{json.dumps(assessment, ensure_ascii=False)[:5000]}
+
+Notes:
+{json.dumps(note_payload or {}, ensure_ascii=False)[:5000]}
+
+Return JSON only with this shape:
+- cards: array of 5 to 8 objects
+
+Each card object must have:
+- question
+- answer
+- cue
+- card_type
+- source_focus
+
+Rules:
+- Favor active recall questions over passive summaries.
+- Use a mix of key terms, definitions, mechanisms, and known weak areas.
+- Keep answers concise: usually 1 to 3 sentences.
+- "cue" should be a very short hint, not the full answer.
+- "card_type" must be one of: concept, definition, mistake, connection.
+- "source_focus" should name the main concept or section the card is about.
+- Avoid duplicate cards.
+"""
+
+    try:
+        content = _chat_json(
+            settings=settings,
+            system_prompt=(
+                "You create crisp study flashcards that help learners retrieve ideas"
+                " rather than reread them."
+            ),
+            user_prompt=prompt,
+            temperature=0,
+        )
+        payload = _parse_json_payload(content)
+        cards = _normalize_flashcards(payload.get("cards"))
+        return cards or fallback
+    except Exception:
+        return fallback
+
+
 def generate_recall_hint(
     *,
     transcript_so_far: str,
@@ -747,6 +821,46 @@ def _note_sections(value: Any) -> list[dict[str, Any]]:
     return sections
 
 
+def _normalize_flashcards(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    cards: list[dict[str, Any]] = []
+    seen_questions: set[str] = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+
+        question = str(item.get("question") or "").strip()
+        answer = str(item.get("answer") or "").strip()
+        cue = str(item.get("cue") or "").strip() or None
+        card_type = str(item.get("card_type") or "concept").strip().lower()
+        source_focus = str(item.get("source_focus") or "").strip() or None
+
+        if not question or not answer:
+            continue
+
+        if card_type not in {"concept", "definition", "mistake", "connection"}:
+            card_type = "concept"
+
+        question_key = question.lower()
+        if question_key in seen_questions:
+            continue
+        seen_questions.add(question_key)
+
+        cards.append(
+            {
+                "question": question,
+                "answer": answer,
+                "cue": cue,
+                "card_type": card_type,
+                "source_focus": source_focus,
+            }
+        )
+
+    return cards[:8]
+
+
 def _compose_note_content(
     *,
     summary: str,
@@ -783,6 +897,95 @@ def _compose_note_content(
         chunks.append(fallback.strip())
 
     return "\n\n".join(chunk for chunk in chunks if chunk.strip())
+
+
+def _build_flashcards_fallback(
+    *,
+    document_title: str,
+    source_text: str,
+    assessment: dict[str, Any],
+    note_payload: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    cards: list[dict[str, Any]] = []
+    key_terms = _reader_terms((note_payload or {}).get("key_terms"))
+    sections = _note_sections((note_payload or {}).get("sections"))
+    takeaways = _string_list((note_payload or {}).get("key_takeaways"))
+    missing = _string_list(assessment.get("missing")) or _string_list(assessment.get("gaps"))
+    weak_areas = _string_list(assessment.get("weak_areas"))
+
+    for item in key_terms[:3]:
+        cards.append(
+            {
+                "question": f"What does {item['term']} mean in {document_title}?",
+                "answer": item["definition"],
+                "cue": item["term"],
+                "card_type": "definition",
+                "source_focus": item["term"],
+            }
+        )
+
+    for section in sections[:3]:
+        body = " ".join(section.get("bullets", [])[:2]).strip() or str(section.get("body") or "").strip()
+        if not body:
+            continue
+        cards.append(
+            {
+                "question": f"What is the main idea behind {section['heading']}?",
+                "answer": body,
+                "cue": section["heading"],
+                "card_type": "concept",
+                "source_focus": section["heading"],
+            }
+        )
+
+    for item in missing[:2]:
+        cards.append(
+            {
+                "question": f"What did your last recall miss about {item}?",
+                "answer": item,
+                "cue": "Recover the missing concept",
+                "card_type": "mistake",
+                "source_focus": item,
+            }
+        )
+
+    for item in weak_areas[:2]:
+        cards.append(
+            {
+                "question": f"How would you explain {item} more clearly?",
+                "answer": item,
+                "cue": "Add structure or detail",
+                "card_type": "connection",
+                "source_focus": item,
+            }
+        )
+
+    if not cards:
+        sentences = _top_sentences(_reader_paragraphs(source_text), limit=5)
+        for sentence in sentences:
+            cards.append(
+                {
+                    "question": f"What key idea from {document_title} should you recall here?",
+                    "answer": sentence,
+                    "cue": "Main idea",
+                    "card_type": "concept",
+                    "source_focus": document_title,
+                }
+            )
+
+    if takeaways:
+        for takeaway in takeaways[:2]:
+            cards.append(
+                {
+                    "question": "What should you be able to say from memory after this study session?",
+                    "answer": takeaway,
+                    "cue": "Main takeaway",
+                    "card_type": "connection",
+                    "source_focus": takeaway[:120],
+                }
+            )
+
+    return _normalize_flashcards(cards)
 
 
 def _normalize_recall_hint(

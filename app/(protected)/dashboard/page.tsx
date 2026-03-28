@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, Clock3, FileText, NotebookPen } from "lucide-react";
+import { ArrowRight, Clock3, FileText, NotebookPen, PanelsTopLeft } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { MetricCard } from "@/components/app/metric-card";
@@ -21,11 +21,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import type { DocumentRead, NoteRead, StudySessionRead } from "@/lib/types";
+import { groupFlashcardsIntoDecks } from "@/lib/flashcards";
+import type { DocumentRead, FlashcardRead, NoteRead, StudySessionRead } from "@/lib/types";
 
 const EMPTY_DOCUMENTS: DocumentRead[] = [];
 const EMPTY_SESSIONS: StudySessionRead[] = [];
 const EMPTY_NOTES: NoteRead[] = [];
+const EMPTY_FLASHCARDS: FlashcardRead[] = [];
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -48,9 +50,20 @@ export default function DashboardPage() {
     queryFn: () => api.getNotes(token!),
   });
 
+  const flashcardsQuery = useQuery({
+    queryKey: ["flashcards"],
+    enabled: Boolean(token),
+    queryFn: () => api.getFlashcards(token!),
+  });
+
   const documents = documentsQuery.data ?? EMPTY_DOCUMENTS;
   const sessions = sessionsQuery.data ?? EMPTY_SESSIONS;
   const notes = notesQuery.data ?? EMPTY_NOTES;
+  const flashcards = flashcardsQuery.data ?? EMPTY_FLASHCARDS;
+  const practiceDecks = useMemo(
+    () => groupFlashcardsIntoDecks(flashcards),
+    [flashcards],
+  );
 
   const documentMap = useMemo(
     () => new Map(documents.map((document) => [document.id, document])),
@@ -58,9 +71,12 @@ export default function DashboardPage() {
   );
 
   const isLoading =
-    documentsQuery.isLoading || sessionsQuery.isLoading || notesQuery.isLoading;
+    documentsQuery.isLoading ||
+    sessionsQuery.isLoading ||
+    notesQuery.isLoading ||
+    flashcardsQuery.isLoading;
   const hasError =
-    documentsQuery.error || sessionsQuery.error || notesQuery.error;
+    documentsQuery.error || sessionsQuery.error || notesQuery.error || flashcardsQuery.error;
 
   return (
     <div className="space-y-8">
@@ -73,6 +89,9 @@ export default function DashboardPage() {
             <UploadDocumentDialog />
             <Button variant="secondary" asChild>
               <Link href="/documents">Start study session</Link>
+            </Button>
+            <Button variant="secondary" asChild>
+              <Link href="/practice">Open practice</Link>
             </Button>
           </>
         }
@@ -254,6 +273,85 @@ export default function DashboardPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <section className="surface-grid lg:grid-cols-[1.15fr_0.85fr] lg:grid">
+        <Card>
+          <CardHeader>
+            <CardTitle>Practice</CardTitle>
+            <CardDescription>
+              Review the generated flashcards instead of rereading everything from scratch.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <p className="text-sm text-[var(--muted-foreground)]">Loading practice decks...</p>
+            ) : practiceDecks.length === 0 ? (
+              <EmptyState
+                title="No flashcards yet"
+                description="Generate a deck from an assessed session to start active review."
+                action={
+                  <Button asChild>
+                    <Link href="/practice">Open practice</Link>
+                  </Button>
+                }
+              />
+            ) : (
+              practiceDecks.slice(0, 3).map((deck) => (
+                <Link
+                  key={deck.sessionId}
+                  href={`/practice?sessionId=${deck.sessionId}`}
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-[var(--foreground)]">{deck.documentTitle}</p>
+                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                        {deck.cards.length} card{deck.cards.length === 1 ? "" : "s"} ready for recall practice
+                      </p>
+                    </div>
+                    <PanelsTopLeft className="size-5 text-[var(--primary)]" />
+                  </div>
+                  <p className="mt-3 text-xs text-[var(--muted-foreground)]">
+                    Updated{" "}
+                    {formatDistanceToNow(new Date(deck.updatedAt), {
+                      addSuffix: true,
+                    })}
+                  </p>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>How to use this</CardTitle>
+            <CardDescription>
+              Keep the loop active: assess first, then turn the session into a small deck you can actually practice.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[
+              "Finish a session and open the assessment page.",
+              "Generate a flashcard deck from that session.",
+              "Use Practice to reveal answers only after you attempt recall.",
+            ].map((item) => (
+              <div
+                key={item}
+                className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-3 text-sm leading-7 text-[var(--muted-foreground)]"
+              >
+                {item}
+              </div>
+            ))}
+            <Button asChild className="w-full">
+              <Link href="/practice">
+                Go to practice
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

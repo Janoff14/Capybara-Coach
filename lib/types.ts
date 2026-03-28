@@ -61,6 +61,22 @@ export type NoteRead = {
   updated_at: string;
 };
 
+export type FlashcardRead = {
+  id: string;
+  study_session_id: string;
+  note_id: string | null;
+  document_id: string;
+  document_title: string;
+  order_index: number;
+  question: string;
+  answer: string;
+  cue: string | null;
+  card_type: string;
+  source_focus: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NoteSection = {
   heading: string;
   body?: string;

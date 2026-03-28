@@ -227,6 +227,25 @@ class PipelineApiTests(unittest.TestCase):
                     "content": "Objects resist changes to their motion unless a net force acts.",
                 },
             ),
+            patch(
+                "app.api.routes.sessions.generate_flashcards",
+                return_value=[
+                    {
+                        "question": "What does Newton's first law say?",
+                        "answer": "Objects stay at rest or in uniform motion unless a net force acts on them.",
+                        "cue": "State the law cleanly.",
+                        "card_type": "definition",
+                        "source_focus": "Newton's first law",
+                    },
+                    {
+                        "question": "What role does net force play?",
+                        "answer": "A net force changes an object's state of motion.",
+                        "cue": "Think about what changes motion.",
+                        "card_type": "concept",
+                        "source_focus": "net force",
+                    },
+                ],
+            ),
         ):
             me_response = self.client.get("/auth/me", headers=headers)
             self.assertEqual(me_response.status_code, 200)
@@ -352,6 +371,35 @@ class PipelineApiTests(unittest.TestCase):
             )
             self.assertEqual(fetch_response.status_code, 200)
             self.assertEqual(fetch_response.json()["assessment_feedback"], "Accurate explanation with clear wording.")
+
+            flashcards_response = self.client.post(
+                f"/sessions/{study_session['id']}/flashcards",
+                headers=headers,
+            )
+            self.assertEqual(flashcards_response.status_code, 200)
+            self.assertEqual(len(flashcards_response.json()), 2)
+            self.assertEqual(
+                flashcards_response.json()[0]["document_title"],
+                "physics",
+            )
+
+            repeated_flashcards_response = self.client.post(
+                f"/sessions/{study_session['id']}/flashcards",
+                headers=headers,
+            )
+            self.assertEqual(repeated_flashcards_response.status_code, 200)
+            self.assertEqual(len(repeated_flashcards_response.json()), 2)
+
+            flashcards_list_response = self.client.get("/flashcards", headers=headers)
+            self.assertEqual(flashcards_list_response.status_code, 200)
+            self.assertEqual(len(flashcards_list_response.json()), 2)
+
+            filtered_flashcards_response = self.client.get(
+                f"/flashcards?session_id={study_session['id']}",
+                headers=headers,
+            )
+            self.assertEqual(filtered_flashcards_response.status_code, 200)
+            self.assertEqual(len(filtered_flashcards_response.json()), 2)
 
     def test_cors_allows_vercel_origins(self) -> None:
         response = self.client.options(
