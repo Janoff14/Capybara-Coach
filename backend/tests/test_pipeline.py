@@ -155,6 +155,7 @@ class PipelineApiTests(unittest.TestCase):
                 return_value={
                     "score": 91,
                     "strictness": 72,
+                    "protocol_version": 3,
                     "verdict": "Strong recall with one missing layer of detail.",
                     "criteria": {
                         "coverage": 90,
@@ -163,9 +164,36 @@ class PipelineApiTests(unittest.TestCase):
                         "structure": 88,
                         "depth": 80,
                     },
+                    "rubric": {
+                        "coverage": "solid",
+                        "accuracy": "solid",
+                        "clarity": "solid",
+                        "structure": "solid",
+                        "depth": "partial",
+                    },
+                    "score_protocol": {
+                        "base_score": 88,
+                        "strictness_factor": 0.72,
+                        "raw_penalty": 6,
+                        "penalty_points": 4,
+                        "penalty_breakdown": {
+                            "missing": 4,
+                            "weak_areas": 2,
+                            "inaccuracies": 0,
+                        },
+                        "weights": {
+                            "coverage": 0.28,
+                            "accuracy": 0.30,
+                            "clarity": 0.16,
+                            "structure": 0.12,
+                            "depth": 0.14,
+                        },
+                        "score": 91,
+                    },
                     "covered_well": ["Defines inertia well"],
                     "missing": ["Could state the role of net force more explicitly"],
                     "weak_areas": ["Structure gets slightly compressed near the end"],
+                    "inaccuracies": [],
                     "next_steps": ["Add one concrete example of the law in action"],
                     "accuracy": 92,
                     "coverage": 90,
@@ -177,7 +205,7 @@ class PipelineApiTests(unittest.TestCase):
                     "strengths": ["Defines inertia well"],
                     "gaps": ["Could add a concrete example"],
                 },
-            ),
+            ) as assess_transcript_mock,
             patch(
                 "app.api.routes.sessions.generate_recall_hint",
                 return_value={
@@ -283,6 +311,26 @@ class PipelineApiTests(unittest.TestCase):
                 assess_response.json()["assessment_json"]["criteria"]["structure"],
                 88,
             )
+            self.assertEqual(
+                assess_response.json()["assessment_json"]["protocol_version"],
+                3,
+            )
+            self.assertEqual(assess_transcript_mock.call_count, 1)
+
+            cached_assess_response = self.client.post(
+                f"/sessions/{study_session['id']}/assess?strictness=72",
+                headers=headers,
+            )
+            self.assertEqual(cached_assess_response.status_code, 200)
+            self.assertEqual(cached_assess_response.json()["assessment_score"], 91)
+            self.assertEqual(assess_transcript_mock.call_count, 1)
+
+            stricter_assess_response = self.client.post(
+                f"/sessions/{study_session['id']}/assess?strictness=90",
+                headers=headers,
+            )
+            self.assertEqual(stricter_assess_response.status_code, 200)
+            self.assertEqual(assess_transcript_mock.call_count, 2)
 
             notes_response = self.client.post(
                 f"/sessions/{study_session['id']}/notes",

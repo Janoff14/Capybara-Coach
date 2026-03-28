@@ -386,14 +386,14 @@ export default function AssessmentPage() {
                   className="w-full"
                   variant={hasStrictnessChanged ? "default" : "secondary"}
                   onClick={() => rerunAssessmentMutation.mutate()}
-                  disabled={rerunAssessmentMutation.isPending}
+                  disabled={rerunAssessmentMutation.isPending || !hasStrictnessChanged}
                 >
                   <RefreshCw className={rerunAssessmentMutation.isPending ? "size-4 animate-spin" : "size-4"} />
                   {rerunAssessmentMutation.isPending
                     ? "Reassessing..."
                     : hasStrictnessChanged
                       ? "Apply strictness and reassess"
-                      : "Run assessment again"}
+                      : "Current strictness already applied"}
                 </Button>
               </CardContent>
             </Card>

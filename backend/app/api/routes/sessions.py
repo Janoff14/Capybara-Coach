@@ -10,6 +10,7 @@ from app.models.study_session import StudySession
 from app.models.user import User
 from app.schemas.session import RecallHintRead, SessionCreate, StudySessionRead
 from app.services.ai import (
+    ASSESSMENT_PROTOCOL_VERSION,
     assess_transcript,
     generate_notes,
     generate_recall_hint,
@@ -20,6 +21,13 @@ from app.services.auth import get_current_user
 from app.services.storage import build_object_path, download_bytes, sanitize_filename, upload_bytes
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+
+def _coerce_int(value: object, default: int = -1) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 def _session_query():
@@ -246,6 +254,14 @@ def run_assessment(
     study_session = _get_session_or_404(db, session_id, current_user.id)
     if not study_session.transcript_text:
         raise HTTPException(status_code=400, detail="Transcribe audio before assessment.")
+
+    existing_assessment = study_session.assessment_json or {}
+    if (
+        isinstance(existing_assessment, dict)
+        and _coerce_int(existing_assessment.get("strictness")) == strictness
+        and _coerce_int(existing_assessment.get("protocol_version")) == ASSESSMENT_PROTOCOL_VERSION
+    ):
+        return _get_session_or_404(db, session_id, current_user.id)
 
     try:
         assessment = assess_transcript(

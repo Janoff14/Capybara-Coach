@@ -10,6 +10,34 @@ from openai import AzureOpenAI
 
 from app.core.config import Settings
 
+ASSESSMENT_PROTOCOL_VERSION = 3
+ASSESSMENT_LEVEL_SCORES = {
+    "missing": 20,
+    "weak": 40,
+    "partial": 60,
+    "solid": 80,
+    "strong": 95,
+}
+ASSESSMENT_LEVEL_ALIASES = {
+    "none": "missing",
+    "absent": "missing",
+    "poor": "weak",
+    "limited": "weak",
+    "developing": "partial",
+    "adequate": "partial",
+    "good": "solid",
+    "clear": "solid",
+    "excellent": "strong",
+    "precise": "strong",
+}
+ASSESSMENT_WEIGHTS = {
+    "coverage": 0.28,
+    "accuracy": 0.30,
+    "clarity": 0.16,
+    "structure": 0.12,
+    "depth": 0.14,
+}
+
 
 def _create_client(settings: Settings) -> AzureOpenAI:
     if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
@@ -66,31 +94,29 @@ Source:
 Student:
 {transcript}
 
-Score out of 100 based on:
-- coverage
-- accuracy
-- clarity
-- structure
-- depth
-
 Strictness:
 {clamped_strictness}/100
 
 Return JSON only with these keys:
-- score
-- verdict
 - feedback
+- verdict
 - covered_well
 - missing
 - weak_areas
+- inaccuracies
 - next_steps
-- criteria
+- rubric
 
 Rules:
-- "criteria" must be an object with numeric scores for coverage, accuracy, clarity, structure, and depth.
-- "covered_well", "missing", "weak_areas", and "next_steps" should each contain 2 to 5 short bullets.
-- At low strictness, reward correct big-picture understanding even if phrasing is rough.
-- At high strictness, penalize missing precision, weak structure, and shallow explanation more heavily.
+- "rubric" must be an object with keys coverage, accuracy, clarity, structure, and depth.
+- Each rubric value must be exactly one of: missing, weak, partial, solid, strong.
+- Keep the rubric objective. Do not let strictness change the rubric labels themselves.
+- "covered_well", "missing", "weak_areas", "inaccuracies", and "next_steps" should each contain 2 to 5 short bullets when possible.
+- "missing" means important concepts that were absent.
+- "weak_areas" means ideas that appeared but were vague, thin, poorly connected, or under-explained.
+- "inaccuracies" means incorrect or misleading claims. Return an empty list if there were none.
+- Use "covered_well" only for points the student explained correctly enough to count.
+- Strictness is only for how demanding the final score should be when weaknesses exist.
 - Keep feedback direct, useful, and specific.
 """
 
@@ -98,26 +124,55 @@ Rules:
         settings=settings,
         system_prompt="You are a strict evaluator for study recall.",
         user_prompt=prompt,
+        temperature=0,
     )
     payload = _parse_json_payload(content)
-    criteria = _normalize_assessment_criteria(payload)
-    score = _coerce_score(payload.get("score"))
+    criteria_levels = _normalize_assessment_rubric(payload)
+    criteria = {
+        name: ASSESSMENT_LEVEL_SCORES[level]
+        for name, level in criteria_levels.items()
+    }
     covered_well = _assessment_list(payload, "covered_well", "strengths")
     missing = _assessment_list(payload, "missing", "gaps")
     weak_areas = _assessment_list(payload, "weak_areas")
+    inaccuracies = _assessment_list(payload, "inaccuracies", "incorrect_points", "mistakes")
     next_steps = _assessment_list(payload, "next_steps")
-    verdict = str(payload.get("verdict") or _default_assessment_verdict(score, clamped_strictness)).strip()
-    feedback = str(payload.get("feedback") or verdict or "No feedback returned.").strip()
+    score_protocol = _compute_assessment_score_protocol(
+        criteria=criteria,
+        missing=missing,
+        weak_areas=weak_areas,
+        inaccuracies=inaccuracies,
+        strictness=clamped_strictness,
+    )
+    score = score_protocol["score"]
+    verdict = str(
+        payload.get("verdict")
+        or _default_assessment_verdict(score, clamped_strictness)
+    ).strip()
+    feedback = str(
+        payload.get("feedback")
+        or _compose_assessment_feedback(
+            verdict=verdict,
+            covered_well=covered_well,
+            missing=missing,
+            weak_areas=weak_areas,
+            inaccuracies=inaccuracies,
+        )
+    ).strip()
 
     return {
         "score": score,
         "strictness": clamped_strictness,
+        "protocol_version": ASSESSMENT_PROTOCOL_VERSION,
         "verdict": verdict,
         "feedback": feedback,
         "criteria": criteria,
+        "rubric": criteria_levels,
+        "score_protocol": score_protocol,
         "covered_well": covered_well,
         "missing": missing,
         "weak_areas": weak_areas,
+        "inaccuracies": inaccuracies,
         "next_steps": next_steps,
         "coverage": criteria["coverage"],
         "accuracy": criteria["accuracy"],
@@ -126,7 +181,7 @@ Rules:
         "depth": criteria["depth"],
         "examples": criteria["depth"],
         "strengths": covered_well,
-        "gaps": _dedupe_strings([*missing, *weak_areas]),
+        "gaps": _dedupe_strings([*missing, *weak_areas, *inaccuracies]),
     }
 
 
@@ -416,15 +471,27 @@ def _normalize_reader_guide(
     }
 
 
-def _chat_json(*, settings: Settings, system_prompt: str, user_prompt: str) -> str:
+def _chat_json(
+    *,
+    settings: Settings,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float | None = None,
+) -> str:
     client = _create_client(settings)
-    response = client.chat.completions.create(
-        model=settings.azure_openai_text_deployment,
-        messages=[
+    request_kwargs: dict[str, Any] = {
+        "model": settings.azure_openai_text_deployment,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        response_format={"type": "json_object"},
+        "response_format": {"type": "json_object"},
+    }
+    if temperature is not None:
+        request_kwargs["temperature"] = temperature
+
+    response = client.chat.completions.create(
+        **request_kwargs,
     )
     return _content_to_text(response.choices[0].message.content)
 
@@ -496,17 +563,82 @@ def _assessment_list(payload: dict[str, Any], *keys: str) -> list[str]:
     return []
 
 
-def _normalize_assessment_criteria(payload: dict[str, Any]) -> dict[str, int]:
-    criteria_payload = payload.get("criteria")
-    criteria_source = criteria_payload if isinstance(criteria_payload, dict) else {}
+def _normalize_assessment_rubric(payload: dict[str, Any]) -> dict[str, str]:
+    rubric_payload = payload.get("rubric")
+    rubric_source = rubric_payload if isinstance(rubric_payload, dict) else {}
 
     return {
-        "coverage": _coerce_score(criteria_source.get("coverage") or payload.get("coverage")),
-        "accuracy": _coerce_score(criteria_source.get("accuracy") or payload.get("accuracy")),
-        "clarity": _coerce_score(criteria_source.get("clarity") or payload.get("clarity")),
-        "structure": _coerce_score(criteria_source.get("structure") or payload.get("structure")),
-        "depth": _coerce_score(criteria_source.get("depth") or payload.get("depth") or payload.get("examples")),
+        "coverage": _coerce_assessment_level(rubric_source.get("coverage") or payload.get("coverage")),
+        "accuracy": _coerce_assessment_level(rubric_source.get("accuracy") or payload.get("accuracy")),
+        "clarity": _coerce_assessment_level(rubric_source.get("clarity") or payload.get("clarity")),
+        "structure": _coerce_assessment_level(rubric_source.get("structure") or payload.get("structure")),
+        "depth": _coerce_assessment_level(rubric_source.get("depth") or payload.get("depth") or payload.get("examples")),
     }
+
+
+def _coerce_assessment_level(value: Any) -> str:
+    candidate = str(value or "").strip().lower()
+    if candidate in ASSESSMENT_LEVEL_SCORES:
+        return candidate
+    if candidate in ASSESSMENT_LEVEL_ALIASES:
+        return ASSESSMENT_LEVEL_ALIASES[candidate]
+    return "missing"
+
+
+def _compute_assessment_score_protocol(
+    *,
+    criteria: dict[str, int],
+    missing: list[str],
+    weak_areas: list[str],
+    inaccuracies: list[str],
+    strictness: int,
+) -> dict[str, Any]:
+    base_score = round(
+        sum(criteria[name] * ASSESSMENT_WEIGHTS[name] for name in ASSESSMENT_WEIGHTS)
+    )
+    strictness_factor = max(0, min(100, strictness)) / 100
+    raw_penalty = (len(missing) * 4) + (len(weak_areas) * 2) + (len(inaccuracies) * 6)
+    penalty_points = min(30, round(raw_penalty * strictness_factor))
+    final_score = max(0, min(100, round(base_score - penalty_points)))
+
+    return {
+        "base_score": base_score,
+        "strictness_factor": strictness_factor,
+        "raw_penalty": raw_penalty,
+        "penalty_points": penalty_points,
+        "penalty_breakdown": {
+            "missing": len(missing) * 4,
+            "weak_areas": len(weak_areas) * 2,
+            "inaccuracies": len(inaccuracies) * 6,
+        },
+        "weights": ASSESSMENT_WEIGHTS,
+        "score": final_score,
+    }
+
+
+def _compose_assessment_feedback(
+    *,
+    verdict: str,
+    covered_well: list[str],
+    missing: list[str],
+    weak_areas: list[str],
+    inaccuracies: list[str],
+) -> str:
+    lines: list[str] = [verdict]
+
+    if covered_well:
+        lines.append(f"Covered well: {covered_well[0]}.")
+
+    if missing:
+        lines.append(f"Missing: {missing[0]}.")
+
+    if weak_areas:
+        lines.append(f"Needs more depth or structure around: {weak_areas[0]}.")
+
+    if inaccuracies:
+        lines.append(f"Watch accuracy on: {inaccuracies[0]}.")
+
+    return " ".join(line for line in lines if line).strip()
 
 
 def _default_assessment_verdict(score: int, strictness: int) -> str:
