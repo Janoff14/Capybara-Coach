@@ -17,7 +17,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { buildReaderGuide } from "@/lib/document-reader";
-import { buildRecallChecklist, buildRecallPrompts } from "@/lib/recall";
+import {
+  buildFallbackRecallHint,
+  buildRecallChecklist,
+  buildRecallPrompts,
+} from "@/lib/recall";
 import type { RecallHintRead } from "@/lib/types";
 import { useMediaRecorder } from "@/hooks/use-media-recorder";
 import { formatElapsed } from "@/lib/utils";
@@ -158,15 +162,16 @@ export default function StudyRecordPage() {
       hintCountRef.current += 1;
     },
     onError: () => {
-      setActiveHint({
-        state: "encouraging",
-        prompt_type: "recall",
-        message: "Stay with it. Name the next key idea before you restart.",
-        missing_concepts: [],
-        transcript_excerpt: "",
-      });
+      const fallbackHint = buildFallbackRecallHint(
+        document?.title ?? "this document",
+        readerGuide,
+        hintCountRef.current,
+      );
+      lastHintMessageRef.current = fallbackHint.message;
+      setActiveHint(fallbackHint);
       lastHintAtRef.current = Date.now();
       currentPauseHintedRef.current = true;
+      hintCountRef.current += 1;
     },
   });
 
@@ -206,7 +211,7 @@ export default function StudyRecordPage() {
       currentPauseHintedRef.current = false;
     }
 
-    if (!recorder.hasSpoken || recorder.silenceDurationMs < 3200) {
+    if (!recorder.hasSpoken || recorder.silenceDurationMs < 2600) {
       return;
     }
 
@@ -256,7 +261,7 @@ export default function StudyRecordPage() {
       };
     }
 
-    if (recorder.hasSpoken && recorder.silenceDurationMs >= 2400 && !activeHint) {
+    if (recorder.hasSpoken && recorder.silenceDurationMs >= 1800 && !activeHint) {
       return {
         state: "thinking" as const,
         promptType: "recall" as const,
@@ -314,6 +319,16 @@ export default function StudyRecordPage() {
     return "Ready";
   }, [enteredFromReader, recorder.audioBlob, recorder.isRecording]);
 
+  const voiceStatusLabel = useMemo(() => {
+    if (!recorder.isRecording) {
+      return recorder.audioBlob ? "Take recorded" : "Waiting for voice";
+    }
+
+    return recorder.hasSpoken ? "Voice detected" : "Waiting for voice";
+  }, [recorder.audioBlob, recorder.hasSpoken, recorder.isRecording]);
+
+  const quickMicLabel = recorder.isRecording ? "Tap to stop" : "Tap to start";
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -361,11 +376,34 @@ export default function StudyRecordPage() {
                         Speak naturally. The coach only steps in when a pause suggests you are stuck.
                       </p>
                     </div>
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(73,102,64,0.18)] bg-white shadow-[0_16px_34px_rgba(28,27,27,0.08)]">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(180deg,var(--primary-soft),var(--primary))] text-white shadow-[0_12px_24px_rgba(73,102,64,0.22)]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recorder.isRecording) {
+                          recorder.stopRecording();
+                          return;
+                        }
+
+                        void recorder.startRecording();
+                      }}
+                      disabled={submitMutation.isPending}
+                      className="group flex flex-col items-center gap-2 rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-white px-4 py-3 text-center shadow-[0_16px_34px_rgba(28,27,27,0.08)] transition hover:border-[rgba(73,102,64,0.22)] hover:shadow-[0_20px_40px_rgba(28,27,27,0.12)] disabled:opacity-50"
+                    >
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(73,102,64,0.18)] bg-[rgba(255,255,255,0.92)]">
+                        {recorder.isRecording ? (
+                          <span className="absolute inset-0 rounded-full border border-[rgba(73,102,64,0.22)] animate-ping" />
+                        ) : null}
+                        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,var(--primary-soft),var(--primary))] text-white shadow-[0_12px_24px_rgba(73,102,64,0.22)]">
                         <Mic className="size-5" />
+                        </div>
                       </div>
-                    </div>
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                          Quick mic
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-[var(--foreground)]">{quickMicLabel}</p>
+                      </div>
+                    </button>
                   </div>
 
                   <div className="mt-5">
@@ -381,7 +419,7 @@ export default function StudyRecordPage() {
                       {recorder.isRecording ? "Mic hot" : "Mic idle"}
                     </span>
                     <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
-                      {recorder.hasSpoken ? "Voice detected" : "Waiting for voice"}
+                      {voiceStatusLabel}
                     </span>
                     <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
                       {coach.state === "thinking" ? "Coach thinking" : "Coach ready"}
@@ -434,9 +472,21 @@ export default function StudyRecordPage() {
                 <p className="mt-2">
                   Treat this like a spoken retrieval drill. You are not trying to sound perfect on the first sentence, only to recover the material from memory and explain it clearly.
                 </p>
-                <p className="mt-3 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                <p className="mt-3 text-sm leading-7 text-[var(--foreground)]">
                   {coach.message}
                 </p>
+                {activeHint?.missing_concepts.length ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {activeHint.missing_concepts.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full border border-[rgba(73,102,64,0.16)] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               {recorder.error ? (

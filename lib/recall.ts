@@ -1,4 +1,5 @@
 import type { ReaderGuideView } from "@/lib/document-reader";
+import type { RecallHintRead } from "@/lib/types";
 
 export type RecallPrompt = {
   id: string;
@@ -70,4 +71,46 @@ export function buildRecallChecklist(guide: ReaderGuideView) {
 
   checklist.push("End with the takeaway, not with filler.");
   return checklist;
+}
+
+export function buildFallbackRecallHint(
+  documentTitle: string,
+  guide: ReaderGuideView,
+  hintIndex: number,
+): RecallHintRead {
+  const safeTitle = documentTitle.trim() || "this document";
+  const keyTerms = guide.keyTerms;
+  const sections = guide.sections;
+  const prompts = buildRecallPrompts(safeTitle, guide);
+
+  if (keyTerms.length > 0) {
+    const term = keyTerms[hintIndex % keyTerms.length];
+    return {
+      state: "hint",
+      prompt_type: "recall",
+      message: `Define "${term.term}" clearly before you continue.`,
+      missing_concepts: [term.term],
+      transcript_excerpt: "",
+    };
+  }
+
+  if (sections.length > 0) {
+    const section = sections[hintIndex % sections.length];
+    return {
+      state: "hint",
+      prompt_type: "connection",
+      message: `Come back to "${section.title}" and explain why it matters.`,
+      missing_concepts: [section.title],
+      transcript_excerpt: "",
+    };
+  }
+
+  const prompt = prompts[hintIndex % prompts.length];
+  return {
+    state: "encouraging",
+    prompt_type: prompt?.label === "Structure" ? "connection" : "depth",
+    message: prompt?.prompt || `Return to the main idea behind ${safeTitle}.`,
+    missing_concepts: [],
+    transcript_excerpt: "",
+  };
 }
