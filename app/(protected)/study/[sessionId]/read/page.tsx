@@ -53,7 +53,7 @@ export default function StudyReadPage() {
       await queryClient.invalidateQueries({ queryKey: ["sessions", params.sessionId] });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       toast.success("Reading marked as complete.");
-      router.push(`/study/${params.sessionId}/record`);
+      router.push(`/study/${params.sessionId}/record?autostart=1`);
     },
     onError: (error) => {
       const message =

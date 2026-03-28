@@ -1,18 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mic, PauseCircle, PlayCircle, Square, Upload } from "lucide-react";
+import { FileLock2, Mic, PauseCircle, PlayCircle, Sparkles, Square, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
+import { RecallSessionPanel } from "@/components/app/recall-session-panel";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
+import { buildReaderGuide } from "@/lib/document-reader";
+import { buildRecallChecklist, buildRecallPrompts } from "@/lib/recall";
 import { useMediaRecorder } from "@/hooks/use-media-recorder";
 import { formatElapsed } from "@/lib/utils";
 
@@ -35,9 +38,13 @@ function getFileExtension(mimeType: string | null) {
 export default function StudyRecordPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { token } = useAuth();
   const recorder = useMediaRecorder();
+  const autoStartRequested = searchParams.get("autostart") === "1";
+  const autoStartAttemptedRef = useRef(false);
+  const [enteredFromReader] = useState(autoStartRequested);
 
   const sessionQuery = useQuery({
     queryKey: ["sessions", params.sessionId],
@@ -89,34 +96,69 @@ export default function StudyRecordPage() {
 
   const session = sessionQuery.data;
   const document = documentQuery.data;
+  const readerGuide = useMemo(
+    () => buildReaderGuide(document?.extracted_text ?? "", document?.reader_json ?? null),
+    [document?.extracted_text, document?.reader_json],
+  );
+  const recallPrompts = useMemo(
+    () => buildRecallPrompts(document?.title ?? "this document", readerGuide),
+    [document?.title, readerGuide],
+  );
+  const recallChecklist = useMemo(
+    () => buildRecallChecklist(readerGuide),
+    [readerGuide],
+  );
 
   const canOpenAssessment =
     session?.status === "assessed" || session?.status === "notes_ready";
 
+  useEffect(() => {
+    if (!autoStartRequested || autoStartAttemptedRef.current) {
+      return;
+    }
+
+    if (!recorder.isSupported || recorder.isRecording || recorder.audioBlob) {
+      return;
+    }
+
+    autoStartAttemptedRef.current = true;
+    void recorder.startRecording();
+    router.replace(`/study/${params.sessionId}/record`);
+  }, [
+    autoStartRequested,
+    params.sessionId,
+    recorder,
+    router,
+  ]);
+
   const recorderStateLabel = useMemo(() => {
     if (recorder.isRecording) {
-      return "Recording";
+      return "Live recall";
     }
 
     if (recorder.audioBlob) {
-      return "Ready to submit";
+      return "Take captured";
     }
 
-    return "Idle";
-  }, [recorder.audioBlob, recorder.isRecording]);
+    if (enteredFromReader) {
+      return "Priming recall";
+    }
+
+    return "Ready";
+  }, [enteredFromReader, recorder.audioBlob, recorder.isRecording]);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        eyebrow="Recording"
-        title={document?.title ?? "Record your explanation"}
-        description="Explain the source back in your own words. Once you submit the recording, the app will upload it, transcribe it, and run assessment before routing you to the results."
+        eyebrow="Recall mode"
+        title={document?.title ?? "Recall from memory"}
+        description="The source is intentionally out of view now. Speak the material back from memory, then let the app upload, transcribe, and assess the explanation for you."
         actions={
           <>
             {session ? <SessionStatusBadge status={session.status} /> : null}
             {canOpenAssessment ? (
               <Button variant="secondary" onClick={() => router.push(`/study/${params.sessionId}/assessment`)}>
-                Open assessment
+                Open feedback
               </Button>
             ) : null}
           </>
@@ -132,13 +174,22 @@ export default function StudyRecordPage() {
         <div className="surface-grid xl:grid-cols-[1.15fr_0.85fr] xl:grid">
           <Card>
             <CardHeader>
-              <CardTitle>Recorder</CardTitle>
+              <CardTitle>Recall recorder</CardTitle>
               <CardDescription>
-                Keep the explanation concise and cover the key points you just read.
+                Start with the big idea, then reconstruct the important parts in your own sequence and language.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                    Mode
+                  </p>
+                  <div className="mt-2 flex items-center gap-2 text-lg font-semibold text-[var(--foreground)]">
+                    <FileLock2 className="size-4 text-[var(--primary)]" />
+                    Source hidden
+                  </div>
+                </div>
                 <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                     State
@@ -157,6 +208,16 @@ export default function StudyRecordPage() {
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.82))] px-4 py-4 text-sm leading-7 text-[var(--muted-foreground)]">
+                <div className="flex items-center gap-2 text-[var(--foreground)]">
+                  <Sparkles className="size-4 text-[var(--primary)]" />
+                  <p className="font-semibold">Recall cue</p>
+                </div>
+                <p className="mt-2">
+                  Treat this like a spoken retrieval drill. You are not trying to sound perfect on the first sentence, only to recover the material from memory and explain it clearly.
+                </p>
+              </div>
+
               {recorder.error ? (
                 <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
                   {recorder.error}
@@ -170,7 +231,7 @@ export default function StudyRecordPage() {
                   disabled={recorder.isRecording || submitMutation.isPending}
                 >
                   <Mic className="size-4" />
-                  Start recording
+                  {enteredFromReader && !recorder.audioBlob ? "Start recall manually" : "Start recall"}
                 </Button>
                 <Button
                   size="lg"
@@ -213,38 +274,17 @@ export default function StudyRecordPage() {
                 <Upload className="size-4" />
                 {submitMutation.isPending
                   ? "Uploading, transcribing, and assessing..."
-                  : "Submit recording"}
+                  : "Submit recall"}
               </Button>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Session guidance</CardTitle>
-              <CardDescription>
-                Use the recording to prove recall, not to reread the document aloud.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 text-sm leading-7 text-[var(--muted-foreground)]">
-                <p className="font-semibold text-[var(--foreground)]">Aim for this structure</p>
-                <ol className="mt-3 space-y-2">
-                  <li>1. State the main idea clearly.</li>
-                  <li>2. Cover the key supporting points from memory.</li>
-                  <li>3. Give one example if it helps.</li>
-                  <li>4. Keep it concise and confident.</li>
-                </ol>
-              </div>
-
-              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 text-sm text-[var(--muted-foreground)]">
-                <p className="font-semibold text-[var(--foreground)]">Current document</p>
-                <p className="mt-2">{document?.title ?? "Loading document..."}</p>
-                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                  {document?.page_count ?? "--"} pages
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <RecallSessionPanel
+            checklist={recallChecklist}
+            documentTitle={document?.title ?? "Current document"}
+            pageCount={document?.page_count ?? null}
+            prompts={recallPrompts}
+          />
         </div>
       )}
     </div>
