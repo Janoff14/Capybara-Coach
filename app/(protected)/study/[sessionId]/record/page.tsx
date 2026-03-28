@@ -26,6 +26,8 @@ import type { RecallHintRead } from "@/lib/types";
 import { useMediaRecorder } from "@/hooks/use-media-recorder";
 import { formatElapsed } from "@/lib/utils";
 
+const HINT_PAUSE_THRESHOLD_MS = 5000;
+
 function getFileExtension(mimeType: string | null) {
   if (!mimeType) {
     return "webm";
@@ -233,7 +235,7 @@ export default function StudyRecordPage() {
       currentPauseHintedRef.current = false;
     }
 
-    if (!recorder.hasSpoken || recorder.silenceDurationMs < 2600) {
+    if (!recorder.hasSpoken || recorder.silenceDurationMs < HINT_PAUSE_THRESHOLD_MS) {
       return;
     }
 
@@ -284,7 +286,7 @@ export default function StudyRecordPage() {
       };
     }
 
-    if (recorder.hasSpoken && recorder.silenceDurationMs >= 1800 && !activeHint) {
+    if (recorder.hasSpoken && recorder.silenceDurationMs >= HINT_PAUSE_THRESHOLD_MS && !activeHint) {
       return {
         state: "thinking" as const,
         promptType: "recall" as const,
