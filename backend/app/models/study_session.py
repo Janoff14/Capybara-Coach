@@ -48,3 +48,8 @@ class StudySession(Base):
         back_populates="study_session",
         cascade="all, delete-orphan",
     )
+    review_schedule: Mapped["ReviewSchedule | None"] = relationship(
+        back_populates="study_session",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

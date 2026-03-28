@@ -390,6 +390,12 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(repeated_flashcards_response.status_code, 200)
             self.assertEqual(len(repeated_flashcards_response.json()), 2)
 
+            reviews_response = self.client.get("/reviews", headers=headers)
+            self.assertEqual(reviews_response.status_code, 200)
+            self.assertEqual(len(reviews_response.json()), 1)
+            self.assertTrue(reviews_response.json()[0]["is_due"])
+            self.assertEqual(reviews_response.json()[0]["current_interval_days"], 1)
+
             flashcards_list_response = self.client.get("/flashcards", headers=headers)
             self.assertEqual(flashcards_list_response.status_code, 200)
             self.assertEqual(len(flashcards_list_response.json()), 2)
@@ -400,6 +406,16 @@ class PipelineApiTests(unittest.TestCase):
             )
             self.assertEqual(filtered_flashcards_response.status_code, 200)
             self.assertEqual(len(filtered_flashcards_response.json()), 2)
+
+            grade_review_response = self.client.post(
+                f"/reviews/{study_session['id']}/grade",
+                headers=headers,
+                json={"rating": "easy"},
+            )
+            self.assertEqual(grade_review_response.status_code, 200)
+            self.assertEqual(grade_review_response.json()["last_rating"], "easy")
+            self.assertEqual(grade_review_response.json()["current_interval_days"], 7)
+            self.assertFalse(grade_review_response.json()["is_due"])
 
     def test_cors_allows_vercel_origins(self) -> None:
         response = self.client.options(

@@ -37,3 +37,7 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="user")
+    review_schedules: Mapped[list["ReviewSchedule"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

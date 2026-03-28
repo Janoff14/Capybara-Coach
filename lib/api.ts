@@ -5,6 +5,7 @@ import type {
   LoginInput,
   NoteRead,
   RecallHintRead,
+  ReviewScheduleRead,
   RegisterInput,
   StudySessionRead,
   TokenResponse,
@@ -269,6 +270,18 @@ export const api = {
     return request<FlashcardRead[]>(`/sessions/${sessionId}/flashcards`, {
       method: "POST",
       token,
+    });
+  },
+
+  getReviews(token: string) {
+    return request<ReviewScheduleRead[]>("/reviews", { token });
+  },
+
+  gradeReview(token: string, sessionId: string, rating: "easy" | "medium" | "hard") {
+    return request<ReviewScheduleRead>(`/reviews/${sessionId}/grade`, {
+      method: "POST",
+      token,
+      json: { rating },
     });
   },
 };

@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, Clock3, FileText, NotebookPen, PanelsTopLeft } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  Clock3,
+  FileText,
+  NotebookPen,
+  PanelsTopLeft,
+} from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { MetricCard } from "@/components/app/metric-card";
@@ -22,12 +29,19 @@ import {
 } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { groupFlashcardsIntoDecks } from "@/lib/flashcards";
-import type { DocumentRead, FlashcardRead, NoteRead, StudySessionRead } from "@/lib/types";
+import type {
+  DocumentRead,
+  FlashcardRead,
+  NoteRead,
+  ReviewScheduleRead,
+  StudySessionRead,
+} from "@/lib/types";
 
 const EMPTY_DOCUMENTS: DocumentRead[] = [];
 const EMPTY_SESSIONS: StudySessionRead[] = [];
 const EMPTY_NOTES: NoteRead[] = [];
 const EMPTY_FLASHCARDS: FlashcardRead[] = [];
+const EMPTY_REVIEWS: ReviewScheduleRead[] = [];
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -56,13 +70,28 @@ export default function DashboardPage() {
     queryFn: () => api.getFlashcards(token!),
   });
 
+  const reviewsQuery = useQuery({
+    queryKey: ["reviews"],
+    enabled: Boolean(token),
+    queryFn: () => api.getReviews(token!),
+  });
+
   const documents = documentsQuery.data ?? EMPTY_DOCUMENTS;
   const sessions = sessionsQuery.data ?? EMPTY_SESSIONS;
   const notes = notesQuery.data ?? EMPTY_NOTES;
   const flashcards = flashcardsQuery.data ?? EMPTY_FLASHCARDS;
+  const reviews = reviewsQuery.data ?? EMPTY_REVIEWS;
   const practiceDecks = useMemo(
     () => groupFlashcardsIntoDecks(flashcards),
     [flashcards],
+  );
+  const dueReviews = useMemo(
+    () => reviews.filter((review) => review.is_due),
+    [reviews],
+  );
+  const upcomingReviews = useMemo(
+    () => reviews.filter((review) => !review.is_due),
+    [reviews],
   );
 
   const documentMap = useMemo(
@@ -74,9 +103,14 @@ export default function DashboardPage() {
     documentsQuery.isLoading ||
     sessionsQuery.isLoading ||
     notesQuery.isLoading ||
-    flashcardsQuery.isLoading;
+    flashcardsQuery.isLoading ||
+    reviewsQuery.isLoading;
   const hasError =
-    documentsQuery.error || sessionsQuery.error || notesQuery.error || flashcardsQuery.error;
+    documentsQuery.error ||
+    sessionsQuery.error ||
+    notesQuery.error ||
+    flashcardsQuery.error ||
+    reviewsQuery.error;
 
   return (
     <div className="space-y-8">
@@ -112,6 +146,11 @@ export default function DashboardPage() {
           label="Notes"
           value={notes.length.toString()}
           hint="Saved outputs you can revisit once a session is complete."
+        />
+        <MetricCard
+          label="Due Reviews"
+          value={dueReviews.length.toString()}
+          hint="Decks ready to be reviewed again today."
         />
       </section>
 
@@ -349,6 +388,85 @@ export default function DashboardPage() {
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="surface-grid lg:grid-cols-[1fr_1fr] lg:grid">
+        <Card>
+          <CardHeader>
+            <CardTitle>Reviews due</CardTitle>
+            <CardDescription>
+              The shortest path back into retention work.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <p className="text-sm text-[var(--muted-foreground)]">Loading due reviews...</p>
+            ) : dueReviews.length === 0 ? (
+              <EmptyState
+                title="Nothing due today"
+                description="Once you finish and grade a deck, it will show up here when it comes due again."
+              />
+            ) : (
+              dueReviews.slice(0, 4).map((review) => (
+                <Link
+                  key={review.id}
+                  href={`/practice?sessionId=${review.study_session_id}`}
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-[var(--foreground)]">{review.document_title}</p>
+                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                        Due now - last rating {review.last_rating ?? "not graded yet"}
+                      </p>
+                    </div>
+                    <CalendarClock className="size-5 text-[var(--primary)]" />
+                  </div>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Upcoming reviews</CardTitle>
+            <CardDescription>
+              What is coming back next in the retention queue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <p className="text-sm text-[var(--muted-foreground)]">Loading upcoming reviews...</p>
+            ) : upcomingReviews.length === 0 ? (
+              <EmptyState
+                title="No future reviews yet"
+                description="Grade a deck after practice and it will be scheduled here."
+              />
+            ) : (
+              upcomingReviews.slice(0, 4).map((review) => (
+                <Link
+                  key={review.id}
+                  href={`/practice?sessionId=${review.study_session_id}`}
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-[var(--foreground)]">{review.document_title}</p>
+                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+                        In{" "}
+                        {formatDistanceToNow(new Date(review.next_review_at), {
+                          addSuffix: true,
+                        })}
+                      </p>
+                    </div>
+                    <CalendarClock className="size-5 text-[var(--primary)]" />
+                  </div>
+                </Link>
+              ))
+            )}
           </CardContent>
         </Card>
       </section>

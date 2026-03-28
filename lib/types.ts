@@ -77,6 +77,23 @@ export type FlashcardRead = {
   updated_at: string;
 };
 
+export type ReviewScheduleRead = {
+  id: string;
+  study_session_id: string;
+  document_id: string;
+  document_title: string;
+  note_id: string | null;
+  next_review_at: string;
+  last_reviewed_at: string | null;
+  last_rating: string | null;
+  interval_index: number;
+  current_interval_days: number;
+  completed_reviews: number;
+  is_due: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type NoteSection = {
   heading: string;
   body?: string;

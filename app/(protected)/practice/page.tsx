@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarClock,
   Eye,
   EyeOff,
   Layers3,
@@ -55,6 +56,12 @@ export default function PracticePage() {
     queryFn: () => api.getSession(sessionIdParam!, token!),
   });
 
+  const reviewsQuery = useQuery({
+    queryKey: ["reviews"],
+    enabled: Boolean(token),
+    queryFn: () => api.getReviews(token!),
+  });
+
   const generateDeckMutation = useMutation({
     mutationFn: async () => {
       if (!token || !sessionIdParam) {
@@ -79,6 +86,11 @@ export default function PracticePage() {
   const decks = useMemo(
     () => groupFlashcardsIntoDecks(flashcardsQuery.data ?? []),
     [flashcardsQuery.data],
+  );
+  const reviewMap = useMemo(
+    () =>
+      new Map((reviewsQuery.data ?? []).map((review) => [review.study_session_id, review])),
+    [reviewsQuery.data],
   );
   const selectedSessionId =
     sessionIdParam ?? selectedSessionIdOverride ?? decks[0]?.sessionId ?? null;
@@ -187,7 +199,11 @@ export default function PracticePage() {
               description="Generate the deck again if the session did not produce any cards."
             />
           ) : (
-            <PracticeDeckPlayer key={selectedDeck.sessionId} deck={selectedDeck} />
+            <PracticeDeckPlayer
+              key={selectedDeck.sessionId}
+              deck={selectedDeck}
+              review={reviewMap.get(selectedDeck.sessionId) ?? null}
+            />
           )}
         </div>
       )}
@@ -195,10 +211,46 @@ export default function PracticePage() {
   );
 }
 
-function PracticeDeckPlayer({ deck }: { deck: FlashcardDeck }) {
+function PracticeDeckPlayer({
+  deck,
+  review,
+}: {
+  deck: FlashcardDeck;
+  review: Awaited<ReturnType<typeof api.getReviews>>[number] | null;
+}) {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
   const [cardIndex, setCardIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const activeCard = deck.cards[cardIndex];
+  const isLastCard = cardIndex === deck.cards.length - 1;
+
+  const gradeReviewMutation = useMutation({
+    mutationFn: async (rating: "easy" | "medium" | "hard") => {
+      if (!token) {
+        throw new Error("You need to be logged in to update review progress.");
+      }
+
+      return api.gradeReview(token, deck.sessionId, rating);
+    },
+    onSuccess: async (_, rating) => {
+      await queryClient.invalidateQueries({ queryKey: ["reviews"] });
+      toast.success(
+        rating === "hard"
+          ? "Review marked hard. We will bring it back sooner."
+          : rating === "medium"
+            ? "Review scheduled again."
+            : "Review scheduled further out.",
+      );
+    },
+    onError: (error) => {
+      const message =
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Could not update the review schedule.";
+      toast.error(message);
+    },
+  });
 
   return (
     <div className="space-y-4">
@@ -218,6 +270,36 @@ function PracticeDeckPlayer({ deck }: { deck: FlashcardDeck }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                  Review cadence
+                </p>
+                <p className="mt-2 text-sm leading-7 text-[var(--foreground)]">
+                  {review
+                    ? review.is_due
+                      ? "Due now. Run through the deck, then grade how it felt."
+                      : `Next review ${formatDistanceToNow(new Date(review.next_review_at), {
+                          addSuffix: true,
+                        })}.`
+                    : "No spaced review schedule yet for this deck."}
+                </p>
+              </div>
+              {review ? (
+                <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                  {review.last_rating ? `Last: ${review.last_rating}` : "First review"}
+                </div>
+              ) : null}
+            </div>
+            {review ? (
+              <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                <CalendarClock className="size-3.5 text-[var(--primary)]" />
+                Next review on {format(new Date(review.next_review_at), "PPP")}
+              </div>
+            ) : null}
+          </div>
+
           <div className="rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.07),rgba(255,255,255,0.92))] p-6 shadow-[0_20px_40px_rgba(28,27,27,0.06)]">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
               Prompt
@@ -320,6 +402,39 @@ function PracticeDeckPlayer({ deck }: { deck: FlashcardDeck }) {
           <ArrowRight className="size-4" />
         </Button>
       </div>
+
+      {review && isLastCard && showAnswer ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Grade this review</CardTitle>
+            <CardDescription>
+              Tell the scheduler how this deck felt so it can decide when to bring it back.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <Button
+              variant="secondary"
+              onClick={() => gradeReviewMutation.mutate("hard")}
+              disabled={gradeReviewMutation.isPending}
+            >
+              Hard
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => gradeReviewMutation.mutate("medium")}
+              disabled={gradeReviewMutation.isPending}
+            >
+              Medium
+            </Button>
+            <Button
+              onClick={() => gradeReviewMutation.mutate("easy")}
+              disabled={gradeReviewMutation.isPending}
+            >
+              Easy
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

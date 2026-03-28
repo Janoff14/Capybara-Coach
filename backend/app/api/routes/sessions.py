@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.models.document import Document
 from app.models.flashcard import Flashcard
 from app.models.note import Note
+from app.models.review_schedule import ReviewSchedule
 from app.models.study_session import StudySession
 from app.models.user import User
 from app.schemas.flashcard import FlashcardRead
@@ -22,6 +23,7 @@ from app.services.ai import (
 )
 from app.services.auth import get_current_user
 from app.services.storage import build_object_path, download_bytes, sanitize_filename, upload_bytes
+from app.models.shared import utcnow
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -37,6 +39,8 @@ def _session_query():
     return select(StudySession).options(
         joinedload(StudySession.note),
         joinedload(StudySession.document),
+        joinedload(StudySession.flashcards),
+        joinedload(StudySession.review_schedule),
     )
 
 
@@ -346,7 +350,23 @@ def create_flashcards(
             detail="Assess the session before generating flashcards.",
         )
 
+    def ensure_review_schedule() -> None:
+        if study_session.review_schedule is not None:
+            return
+
+        review_schedule = ReviewSchedule(
+            user_id=study_session.user_id,
+            study_session_id=study_session.id,
+            interval_index=0,
+            current_interval_days=1,
+            completed_reviews=0,
+            next_review_at=utcnow(),
+        )
+        db.add(review_schedule)
+
     if study_session.flashcards:
+        ensure_review_schedule()
+        db.commit()
         return [_serialize_flashcard(card) for card in study_session.flashcards]
 
     try:
@@ -377,6 +397,8 @@ def create_flashcards(
         )
         db.add(card)
         created_cards.append(card)
+
+    ensure_review_schedule()
 
     db.commit()
     return [_serialize_flashcard(card) for card in created_cards]
