@@ -20,10 +20,14 @@ import type { ReaderHighlightType, ReaderKeyTerm } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+const PDF_OPTIONS = {
+  cMapPacked: true,
+  cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+  standardFontDataUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  wasmUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/wasm/`,
+} as const;
 
 type DocumentReaderProps = {
   blob: Blob | null;
@@ -236,7 +240,11 @@ function ReaderSurface({
                       Rendering PDF pages...
                     </div>
                   }
+                  onLoadError={(loadError) => {
+                    console.error("React-PDF failed to load document", loadError);
+                  }}
                   onLoadSuccess={({ numPages: loadedPages }) => setNumPages(loadedPages)}
+                  options={PDF_OPTIONS}
                   error={
                     <div className="rounded-[24px] border border-rose-400/20 bg-rose-500/10 px-6 py-10 text-center text-sm text-rose-100">
                       The PDF renderer could not display this document.
