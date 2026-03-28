@@ -10,17 +10,17 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
+    <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+      <div className="max-w-3xl">
         {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--tertiary)]">
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="mt-2 font-display text-3xl font-extrabold tracking-[-0.05em] text-[var(--foreground)] sm:text-4xl lg:text-[40px]">
+        <h1 className="mt-3 font-display text-4xl font-extrabold tracking-[-0.06em] text-[var(--foreground)] sm:text-5xl">
           {title}
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted-foreground)] sm:text-base">
+        <p className="mt-4 text-base leading-8 text-[var(--foreground-soft)]">
           {description}
         </p>
       </div>

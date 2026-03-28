@@ -10,12 +10,12 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <Card>
+    <Card className="border-dashed">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardTitle className="text-2xl">{title}</CardTitle>
+        <CardDescription className="max-w-xl text-base leading-7">{description}</CardDescription>
       </CardHeader>
-      {action ? <CardContent>{action}</CardContent> : null}
+      {action ? <CardContent className="pt-1">{action}</CardContent> : null}
     </Card>
   );
 }

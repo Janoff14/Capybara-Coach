@@ -17,7 +17,10 @@ function DialogOverlay({
 }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
-      className={cn("fixed inset-0 z-50 bg-[rgba(252,249,248,0.82)] backdrop-blur-[4px]", className)}
+      className={cn(
+        "fixed inset-0 z-50 bg-[rgba(250,249,244,0.78)] backdrop-blur-[8px]",
+        className,
+      )}
       {...props}
     />
   );
@@ -33,7 +36,7 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[rgba(229,226,225,0.9)] bg-white p-6 shadow-[0_20px_40px_rgba(28,27,27,0.08)]",
+          "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-[var(--border-soft)] bg-[rgba(255,255,255,0.94)] p-6 shadow-[var(--shadow-panel)] md:p-8",
           className,
         )}
         {...props}
@@ -49,7 +52,7 @@ function DialogContent({
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("mb-5 flex flex-col gap-2", className)} {...props} />;
+  return <div className={cn("mb-6 flex flex-col gap-2", className)} {...props} />;
 }
 
 function DialogTitle({

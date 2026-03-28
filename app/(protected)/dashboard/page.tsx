@@ -11,11 +11,11 @@ import {
   FileText,
   NotebookPen,
   PanelsTopLeft,
+  Sparkles,
 } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { MetricCard } from "@/components/app/metric-card";
-import { PageHeader } from "@/components/app/page-header";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -113,44 +113,64 @@ export default function DashboardPage() {
     reviewsQuery.error;
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Dashboard"
-        title="Everything you need for the next study loop."
-        description="Keep the workflow tight: upload source material, start a recall session, and turn the result into notes you can actually review."
-        actions={
-          <>
+    <div className="space-y-10">
+      <section className="editorial-panel overflow-hidden rounded-[32px] border border-[var(--border-soft)] p-8 sm:p-10">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--tertiary)]">
+              Dashboard
+            </p>
+            <h1 className="mt-4 font-display text-4xl font-extrabold tracking-[-0.06em] text-[var(--foreground)] sm:text-5xl">
+              Everything you need for the{" "}
+              <span className="italic text-[var(--primary)]">next study loop.</span>
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--foreground-soft)]">
+              Keep the workflow tight: upload source material, start a recall session,
+              assess what came back, and turn the result into notes and practice you
+              can actually revisit later.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
             <UploadDocumentDialog />
             <Button variant="secondary" asChild>
-              <Link href="/documents">Start study session</Link>
+              <Link href="/documents">Documents</Link>
             </Button>
             <Button variant="secondary" asChild>
               <Link href="/practice">Open practice</Link>
             </Button>
-          </>
-        }
-      />
+          </div>
+        </div>
+      </section>
 
       <section className="surface-grid-3">
         <MetricCard
           label="Documents"
           value={documents.length.toString()}
           hint="Stored study sources ready to turn into sessions."
+          icon={<FileText className="size-4" />}
+          tone="primary"
         />
         <MetricCard
           label="Sessions"
           value={sessions.length.toString()}
           hint="Reading, recording, and assessment runs tied to your account."
+          icon={<Clock3 className="size-4" />}
+          tone="secondary"
         />
         <MetricCard
           label="Notes"
           value={notes.length.toString()}
           hint="Saved outputs you can revisit once a session is complete."
+          icon={<NotebookPen className="size-4" />}
+          tone="tertiary"
         />
         <MetricCard
           label="Due Reviews"
           value={dueReviews.length.toString()}
           hint="Decks ready to be reviewed again today."
+          icon={<CalendarClock className="size-4" />}
+          tone={dueReviews.length > 0 ? "danger" : "primary"}
         />
       </section>
 
@@ -228,7 +248,7 @@ export default function DashboardPage() {
                 <Link
                   key={session.id}
                   href={`/study/${session.id}/read`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -275,7 +295,7 @@ export default function DashboardPage() {
                 <Link
                   key={note.id}
                   href={`/notes/${note.id}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -293,7 +313,7 @@ export default function DashboardPage() {
         </Card>
       </section>
 
-      <Card>
+      <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(244,244,238,0.92)_100%)]">
         <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-display text-xl font-bold tracking-[-0.03em] text-[var(--foreground)]">
@@ -339,7 +359,7 @@ export default function DashboardPage() {
                 <Link
                   key={deck.sessionId}
                   href={`/practice?sessionId=${deck.sessionId}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -413,7 +433,7 @@ export default function DashboardPage() {
                 <Link
                   key={review.id}
                   href={`/practice?sessionId=${review.study_session_id}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -450,7 +470,7 @@ export default function DashboardPage() {
                 <Link
                   key={review.id}
                   href={`/practice?sessionId=${review.study_session_id}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(73,102,64,0.04)]"
+                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -470,6 +490,33 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      {!isLoading && sessions[0] ? (
+        <Card className="overflow-hidden bg-[linear-gradient(180deg,rgba(75,102,72,0.96)_0%,rgba(64,89,61,0.96)_100%)] text-white">
+          <CardContent className="flex flex-col gap-5 py-7 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/72">
+                <Sparkles className="size-3.5" />
+                Resume momentum
+              </p>
+              <p className="mt-3 font-display text-2xl font-bold tracking-[-0.04em]">
+                Continue your most recent study flow.
+              </p>
+              <p className="mt-2 max-w-2xl text-sm leading-7 text-white/76">
+                Jump back into{" "}
+                {documentMap.get(sessions[0].document_id)?.title ?? "your latest session"}{" "}
+                and keep the loop moving without starting over.
+              </p>
+            </div>
+            <Button variant="secondary" asChild>
+              <Link href={`/study/${sessions[0].id}/read`}>
+                Resume last session
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -20,6 +20,7 @@ backend/.env
 .DS_Store
 
 .idea/
+artifacts/
 *.iml
 *.ipr
 *.iws

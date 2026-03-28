@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpenText, LayoutDashboard, LogOut, NotebookPen, PanelsTopLeft } from "lucide-react";
+import {
+  Bell,
+  BookOpenText,
+  LayoutDashboard,
+  LogOut,
+  NotebookPen,
+  PanelsTopLeft,
+  Search,
+} from "lucide-react";
 
+import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,10 +24,80 @@ const navigation = [
   { href: "/notes", label: "Notes", icon: NotebookPen },
 ];
 
+function getRouteMeta(pathname: string) {
+  if (pathname.startsWith("/documents")) {
+    return {
+      title: "Documents",
+      description: "Upload source material and turn it into guided study sessions.",
+      active: "/documents",
+    };
+  }
+
+  if (pathname.startsWith("/practice")) {
+    return {
+      title: "Practice",
+      description: "Use flashcards and review schedules to keep recall active.",
+      active: "/practice",
+    };
+  }
+
+  if (pathname.startsWith("/notes")) {
+    return {
+      title: "Notes",
+      description: "Revisit the clean outputs generated from assessed recall sessions.",
+      active: "/notes",
+    };
+  }
+
+  if (pathname.includes("/study/") && pathname.endsWith("/read")) {
+    return {
+      title: "Reader mode",
+      description: "Keep the real source in view while the study guidance stays restrained.",
+      active: "/documents",
+    };
+  }
+
+  if (pathname.includes("/study/") && pathname.endsWith("/record")) {
+    return {
+      title: "Recall mode",
+      description: "Explain the material from memory and let the coach step in only when needed.",
+      active: "/documents",
+    };
+  }
+
+  if (pathname.includes("/study/") && pathname.endsWith("/assessment")) {
+    return {
+      title: "Assessment",
+      description: "Review coverage, weak points, strictness, and the next study step.",
+      active: "/documents",
+    };
+  }
+
+  return {
+    title: "Dashboard",
+    description: "Your current study loop, recent sessions, and retention queue.",
+    active: "/dashboard",
+  };
+}
+
+function getInitials(name?: string | null) {
+  if (!name) {
+    return "CC";
+  }
+
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout, user } = useAuth();
+  const routeMeta = getRouteMeta(pathname);
 
   const handleLogout = () => {
     logout();
@@ -26,78 +105,126 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto min-h-screen max-w-[1600px] lg:grid lg:grid-cols-[280px_1fr]">
-        <aside className="border-b border-[var(--border-soft)] bg-[var(--sidebar)] px-4 py-5 backdrop-blur-[8px] lg:min-h-screen lg:border-b-0 lg:border-r lg:px-6 lg:py-8">
-          <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-                Capybara Coach
-              </p>
-              <h1 className="mt-2 font-display text-2xl font-bold tracking-[-0.04em] text-[var(--primary)]">
-                Study with recall
-              </h1>
-            </div>
-            <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5 text-xs text-[var(--muted-foreground)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-              {user?.display_name ?? "Student"}
-            </div>
-          </div>
+    <div className="min-h-screen bg-background">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 flex-col border-r border-[var(--border-soft)] bg-[var(--sidebar)] px-4 py-8 backdrop-blur-xl lg:flex">
+        <div className="mb-10 px-4">
+          <Link href="/dashboard">
+            <h1 className="font-display text-2xl font-extrabold tracking-[-0.05em] text-[var(--primary)]">
+              Capybara Coach
+            </h1>
+          </Link>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+            Study with recall
+          </p>
+        </div>
 
-          <nav className="mt-6 flex gap-3 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive =
-                pathname === item.href || pathname.startsWith(`${item.href}/`);
+        <nav className="flex flex-1 flex-col gap-2">
+          {navigation.map((item) => {
+            const Icon = item.icon;
+            const isActive = routeMeta.active === item.href;
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "inline-flex items-center gap-3 rounded-xl border border-transparent px-4 py-3 text-sm font-medium transition-colors",
-                    isActive
-                      ? "border-r-4 border-r-[var(--primary)] bg-[var(--sidebar-active)] text-[var(--primary)]"
-                      : "text-[var(--muted-foreground)] hover:bg-[rgba(73,102,64,0.05)] hover:text-[var(--foreground)]",
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "border-r-4 border-[var(--primary)] bg-[var(--sidebar-active)] text-[var(--primary)]"
+                    : "text-[var(--secondary)] hover:bg-[rgba(75,102,72,0.05)] hover:text-[var(--primary)]",
+                )}
+              >
+                <Icon className="size-4" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-          <div className="mt-6 lg:mt-auto lg:pt-10">
-            <Button
-              variant="secondary"
-              className="w-full justify-between"
-              onClick={handleLogout}
-            >
-              Log out
-              <LogOut className="size-4" />
-            </Button>
-          </div>
-        </aside>
+        <div className="mt-auto space-y-4 px-4 pt-6">
+          <UploadDocumentDialog buttonLabel="New entry" />
 
-        <div className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-20 border-b border-[var(--border-soft)] bg-[rgba(252,249,248,0.82)] px-4 py-4 backdrop-blur-[8px] sm:px-6 lg:px-10">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                  Web MVP
+          <div className="rounded-2xl bg-[var(--panel-soft)] p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-full bg-[var(--primary)] text-xs font-bold uppercase tracking-[0.18em] text-white">
+                {getInitials(user?.display_name)}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-[var(--foreground)]">
+                  {user?.display_name ?? "Capybara Coach"}
                 </p>
-                <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                  Focus on the recall loop: read, explain, assess, save.
+                <p className="truncate text-xs text-[var(--muted-foreground)]">
+                  {user?.email ?? "study@mvp.local"}
                 </p>
               </div>
             </div>
-          </header>
+          </div>
 
-          <main className="flex-1 px-4 pb-10 pt-6 sm:px-6 lg:px-10">
-            {children}
-          </main>
+          <Button variant="ghost" className="w-full justify-between" onClick={handleLogout}>
+            Log out
+            <LogOut className="size-4" />
+          </Button>
         </div>
-      </div>
+      </aside>
+
+      <header className="fixed left-0 right-0 top-0 z-30 border-b border-[var(--border-soft)] bg-[rgba(250,249,244,0.84)] px-6 py-4 backdrop-blur-xl lg:left-64 lg:px-8">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-bold tracking-tight text-[var(--primary)]">{routeMeta.title}</p>
+            <p className="mt-1 hidden text-sm text-[var(--muted-foreground)] md:block">
+              {routeMeta.description}
+            </p>
+          </div>
+
+          <div className="hidden min-w-[320px] items-center rounded-full border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-2.5 md:flex lg:min-w-[420px]">
+            <Search className="mr-2 size-4 text-[var(--muted-foreground)]" />
+            <input
+              className="w-full border-none bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)]"
+              placeholder="Search knowledge base..."
+              type="text"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-full p-2 text-[var(--primary)] transition-colors hover:bg-[rgba(75,102,72,0.06)]"
+              type="button"
+              aria-label="Notifications"
+            >
+              <Bell className="size-5" />
+            </button>
+            <div className="hidden h-8 w-px bg-[var(--border-soft)] sm:block" />
+            <div className="hidden rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--foreground-soft)] sm:block">
+              {user?.display_name ?? "Student"}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="px-6 pb-28 pt-24 lg:pl-[19rem] lg:pr-8 lg:pt-24">
+        <div className="mx-auto max-w-7xl">{children}</div>
+      </main>
+
+      <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-[var(--border-soft)] bg-[rgba(250,249,244,0.94)] px-2 py-2 backdrop-blur-xl lg:hidden">
+        {navigation.map((item) => {
+          const Icon = item.icon;
+          const isActive = routeMeta.active === item.href;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex min-w-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em]",
+                isActive ? "text-[var(--primary)]" : "text-[var(--secondary)]",
+              )}
+            >
+              <Icon className="size-4" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }

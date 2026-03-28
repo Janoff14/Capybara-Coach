@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { LockKeyhole, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 import { AuthShell } from "@/components/app/auth-shell";
@@ -57,15 +58,24 @@ export default function LoginPage() {
   return (
     <AuthShell
       mode="login"
-      title="Sign in and pick up your next recall session."
-      description="Use the same backend-issued account you created for the study pipeline. We keep auth simple for the MVP."
+      title="Welcome back."
+      description="Use the same backend-issued account you created for the study pipeline. Your documents, sessions, notes, and reviews stay tied to this account."
     >
-      <form className="space-y-5" onSubmit={onSubmit}>
+      <form className="space-y-6" onSubmit={onSubmit}>
         <div className="space-y-2">
           <Label htmlFor="login-email">Email</Label>
-          <Input id="login-email" type="email" {...form.register("email")} />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+            <Input
+              id="login-email"
+              type="email"
+              className="pl-11"
+              placeholder="name@example.com"
+              {...form.register("email")}
+            />
+          </div>
           {form.formState.errors.email ? (
-            <p className="text-sm text-rose-300">
+            <p className="text-sm text-[var(--danger)]">
               {form.formState.errors.email.message}
             </p>
           ) : null}
@@ -76,26 +86,53 @@ export default function LoginPage() {
             <Label htmlFor="login-password">Password</Label>
             <Link
               href="/register"
-              className="text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--primary)]"
+              className="rounded-full bg-[rgba(253,218,178,0.55)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--tertiary)] transition-colors hover:bg-[rgba(253,218,178,0.8)]"
             >
               New here?
             </Link>
           </div>
-          <Input
-            id="login-password"
-            type="password"
-            {...form.register("password")}
-          />
+          <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+            <Input
+              id="login-password"
+              type="password"
+              className="pl-11"
+              placeholder="Enter your password"
+              {...form.register("password")}
+            />
+          </div>
           {form.formState.errors.password ? (
-            <p className="text-sm text-rose-300">
+            <p className="text-sm text-[var(--danger)]">
               {form.formState.errors.password.message}
             </p>
           ) : null}
         </div>
 
+        <div className="flex items-center justify-between py-1">
+          <label className="flex items-center gap-3 text-sm text-[var(--foreground-soft)]">
+            <input
+              className="size-4 rounded-md border border-[var(--border-soft)] accent-[var(--primary)]"
+              type="checkbox"
+              defaultChecked
+            />
+            Remember me
+          </label>
+          <span className="text-xs text-[var(--muted-foreground)]">JWT access only</span>
+        </div>
+
         <Button className="w-full" size="lg" type="submit" disabled={loginMutation.isPending}>
           {loginMutation.isPending ? "Signing in..." : "Sign in"}
         </Button>
+
+        <p className="text-center text-sm text-[var(--foreground-soft)]">
+          Need an account?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-[var(--primary)] hover:text-[var(--primary-strong)]"
+          >
+            Create one now
+          </Link>
+        </p>
       </form>
     </AuthShell>
   );

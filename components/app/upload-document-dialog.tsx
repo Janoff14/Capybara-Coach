@@ -103,12 +103,25 @@ export function UploadDocumentDialog({
 
           <div className="space-y-2">
             <Label htmlFor="document-file">PDF file</Label>
-            <Input
-              id="document-file"
-              type="file"
-              accept="application/pdf,.pdf"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            />
+            <label
+              htmlFor="document-file"
+              className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--border-soft)] bg-[var(--panel-soft)] px-6 py-8 text-center transition-colors hover:border-[rgba(75,102,72,0.28)] hover:bg-[rgba(205,235,197,0.12)]"
+            >
+              <FileUp className="mb-4 size-8 text-[var(--primary)]" />
+              <p className="font-display text-lg font-bold tracking-[-0.03em] text-[var(--foreground)]">
+                Choose a PDF file
+              </p>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-[var(--muted-foreground)]">
+                We will keep the original file, extract readable text, and prepare it for the study flow.
+              </p>
+              <input
+                id="document-file"
+                className="sr-only"
+                type="file"
+                accept="application/pdf,.pdf"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
             <p className="text-xs text-[var(--muted-foreground)]">
               {file ? `Selected: ${file.name}` : "Choose a single PDF file."}
             </p>

@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, Manrope } from "next/font/google";
+import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
 
 import { AppProviders } from "@/app/providers";
 import "@/app/globals.css";
 
 const manrope = Manrope({
-  variable: "--font-manrope",
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-headline",
   subsets: ["latin"],
 });
 
@@ -25,7 +25,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${manrope.variable} ${inter.variable} min-h-full scroll-smooth`}>
+    <html
+      lang="en"
+      className={`${manrope.variable} ${plusJakartaSans.variable} min-h-full scroll-smooth`}
+    >
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">
         <AppProviders>{children}</AppProviders>
       </body>
