@@ -31,10 +31,22 @@ export type NoteRead = {
   title: string;
   summary: string;
   content: string;
-  note_json: Record<string, unknown> | null;
+  note_json: NoteJson | null;
   created_at: string;
   updated_at: string;
 };
+
+export type NoteSection = {
+  heading: string;
+  body?: string;
+  bullets?: string[];
+};
+
+export type NoteJson = {
+  key_takeaways?: string[];
+  review_questions?: string[];
+  sections?: NoteSection[];
+} & Record<string, unknown>;
 
 export type AssessmentJson = {
   score: number;
