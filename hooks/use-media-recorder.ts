@@ -131,6 +131,7 @@ export function useMediaRecorder() {
 
       if (AudioContextCtor) {
         const audioContext = new AudioContextCtor();
+        await audioContext.resume();
         const analyser = audioContext.createAnalyser();
         const source = audioContext.createMediaStreamSource(stream);
 
@@ -207,7 +208,7 @@ export function useMediaRecorder() {
       };
 
       recorderRef.current = recorder;
-      recorder.start(1000);
+      recorder.start(500);
     } catch (recorderError) {
       const message =
         recorderError instanceof Error

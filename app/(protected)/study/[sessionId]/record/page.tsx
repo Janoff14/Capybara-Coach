@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
 import { RecallSessionPanel } from "@/components/app/recall-session-panel";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
+import { VoiceWaveform } from "@/components/app/voice-waveform";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,6 +119,11 @@ export default function StudyRecordPage() {
 
   const canOpenAssessment =
     session?.status === "assessed" || session?.status === "notes_ready";
+  const shouldAutoStart =
+    autoStartRequested ||
+    (session?.status === "reading_complete" &&
+      !session.audio_storage_path &&
+      !recorder.audioBlob);
 
   const recallHintMutation = useMutation({
     mutationFn: async () => {
@@ -152,14 +158,20 @@ export default function StudyRecordPage() {
       hintCountRef.current += 1;
     },
     onError: () => {
-      setActiveHint(null);
+      setActiveHint({
+        state: "encouraging",
+        prompt_type: "recall",
+        message: "Stay with it. Name the next key idea before you restart.",
+        missing_concepts: [],
+        transcript_excerpt: "",
+      });
       lastHintAtRef.current = Date.now();
       currentPauseHintedRef.current = true;
     },
   });
 
   useEffect(() => {
-    if (!autoStartRequested || autoStartAttemptedRef.current) {
+    if (!shouldAutoStart || autoStartAttemptedRef.current) {
       return;
     }
 
@@ -171,10 +183,10 @@ export default function StudyRecordPage() {
     void recorder.startRecording();
     router.replace(`/study/${params.sessionId}/record`);
   }, [
-    autoStartRequested,
     params.sessionId,
     recorder,
     router,
+    shouldAutoStart,
   ]);
 
   useEffect(() => {
@@ -194,7 +206,7 @@ export default function StudyRecordPage() {
       currentPauseHintedRef.current = false;
     }
 
-    if (!recorder.hasSpoken || recorder.silenceDurationMs < 4200) {
+    if (!recorder.hasSpoken || recorder.silenceDurationMs < 3200) {
       return;
     }
 
@@ -206,7 +218,7 @@ export default function StudyRecordPage() {
       return;
     }
 
-    if (Date.now() - lastHintAtRef.current < 12000) {
+    if (Date.now() - lastHintAtRef.current < 9000) {
       return;
     }
 
@@ -241,6 +253,14 @@ export default function StudyRecordPage() {
         state: "thinking" as const,
         promptType: null,
         message: "Thinking about the gap in your explanation...",
+      };
+    }
+
+    if (recorder.hasSpoken && recorder.silenceDurationMs >= 2400 && !activeHint) {
+      return {
+        state: "thinking" as const,
+        promptType: "recall" as const,
+        message: "Pause noticed. What comes immediately after that main idea?",
       };
     }
 
@@ -327,7 +347,49 @@ export default function StudyRecordPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.88))] p-5 shadow-[0_20px_40px_rgba(28,27,27,0.08)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+                        Live microphone
+                      </p>
+                      <p className="mt-2 font-display text-3xl font-bold tracking-[-0.05em] text-[var(--foreground)]">
+                        {recorder.isRecording ? "Listening now" : "Ready for recall"}
+                      </p>
+                      <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+                        Speak naturally. The coach only steps in when a pause suggests you are stuck.
+                      </p>
+                    </div>
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[rgba(73,102,64,0.18)] bg-white shadow-[0_16px_34px_rgba(28,27,27,0.08)]">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(180deg,var(--primary-soft),var(--primary))] text-white shadow-[0_12px_24px_rgba(73,102,64,0.22)]">
+                        <Mic className="size-5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <VoiceWaveform
+                      audioLevel={recorder.audioLevel}
+                      hasSpoken={recorder.hasSpoken}
+                      isRecording={recorder.isRecording}
+                    />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                      {recorder.isRecording ? "Mic hot" : "Mic idle"}
+                    </span>
+                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                      {recorder.hasSpoken ? "Voice detected" : "Waiting for voice"}
+                    </span>
+                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                      {coach.state === "thinking" ? "Coach thinking" : "Coach ready"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                 <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                     Mode
@@ -361,6 +423,7 @@ export default function StudyRecordPage() {
                     {formatElapsed(Math.floor(recorder.silenceDurationMs / 1000))}
                   </p>
                 </div>
+                </div>
               </div>
 
               <div className="rounded-2xl border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.82))] px-4 py-4 text-sm leading-7 text-[var(--muted-foreground)]">
@@ -371,12 +434,9 @@ export default function StudyRecordPage() {
                 <p className="mt-2">
                   Treat this like a spoken retrieval drill. You are not trying to sound perfect on the first sentence, only to recover the material from memory and explain it clearly.
                 </p>
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-[rgba(73,102,64,0.12)]">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--primary-soft))] transition-all"
-                    style={{ width: `${Math.min(100, Math.max(6, recorder.audioLevel * 1200))}%` }}
-                  />
-                </div>
+                <p className="mt-3 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                  {coach.message}
+                </p>
               </div>
 
               {recorder.error ? (
@@ -388,6 +448,7 @@ export default function StudyRecordPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <Button
                   size="lg"
+                  className="min-w-[12rem]"
                   onClick={() => void recorder.startRecording()}
                   disabled={recorder.isRecording || submitMutation.isPending}
                 >
@@ -397,6 +458,7 @@ export default function StudyRecordPage() {
                 <Button
                   size="lg"
                   variant="secondary"
+                  className="min-w-[9rem]"
                   onClick={recorder.stopRecording}
                   disabled={!recorder.isRecording}
                 >
@@ -406,6 +468,7 @@ export default function StudyRecordPage() {
                 <Button
                   size="lg"
                   variant="ghost"
+                  className="min-w-[9rem]"
                   onClick={recorder.reset}
                   disabled={recorder.isRecording || !recorder.audioBlob}
                 >
