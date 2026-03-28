@@ -14,6 +14,7 @@ class DocumentRead(BaseModel):
     storage_bucket: str
     storage_path: str
     extracted_text: str
+    reader_json: dict | None
     page_count: int
     created_at: datetime
     updated_at: datetime

@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.document import Document
 from app.models.user import User
 from app.schemas.document import DocumentRead
+from app.services.ai import generate_reader_guide
 from app.services.auth import get_current_user
 from app.services.pdf import extract_text_from_payload
 from app.services.storage import build_object_path, download_bytes, sanitize_filename, upload_bytes
@@ -95,6 +96,12 @@ def upload_document(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    reader_json = generate_reader_guide(
+        document_title=title or Path(filename).stem or "Untitled document",
+        source_text=extracted_text,
+        settings=settings,
+    )
+
     object_path = build_object_path(
         "users",
         current_user.id,
@@ -122,6 +129,7 @@ def upload_document(
         storage_bucket=settings.supabase_documents_bucket,
         storage_path=object_path,
         extracted_text=extracted_text,
+        reader_json=reader_json,
         page_count=page_count,
     )
     db.add(document)

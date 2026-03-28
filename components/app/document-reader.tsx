@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Expand, Minimize2 } from "lucide-react";
+import { Expand, Eye, EyeOff, Lightbulb, Minimize2 } from "lucide-react";
 
-import type { ReaderSection } from "@/lib/document-reader";
+import {
+  resolveSentenceHighlight,
+  splitParagraphIntoSentences,
+  type ReaderSection,
+} from "@/lib/document-reader";
+import type { ReaderHighlightType } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -19,6 +24,7 @@ export function DocumentReader({
   sections,
 }: DocumentReaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showHighlights, setShowHighlights] = useState(true);
 
   useEffect(() => {
     if (!isFullscreen) {
@@ -51,7 +57,9 @@ export function DocumentReader({
             sections={sections}
             isLoading={isLoading}
             isFullscreen
+            showHighlights={showHighlights}
             onToggleFullscreen={() => setIsFullscreen(false)}
+            onToggleHighlights={() => setShowHighlights((value) => !value)}
           />
         </div>
       </div>
@@ -64,7 +72,9 @@ export function DocumentReader({
       sections={sections}
       isLoading={isLoading}
       isFullscreen={false}
+      showHighlights={showHighlights}
       onToggleFullscreen={() => setIsFullscreen(true)}
+      onToggleHighlights={() => setShowHighlights((value) => !value)}
     />
   );
 }
@@ -73,13 +83,17 @@ function ReaderSurface({
   isFullscreen,
   isLoading,
   onToggleFullscreen,
+  onToggleHighlights,
   sections,
+  showHighlights,
   title,
 }: {
   isFullscreen: boolean;
   isLoading: boolean;
   onToggleFullscreen: () => void;
+  onToggleHighlights: () => void;
   sections: ReaderSection[];
+  showHighlights: boolean;
   title: string;
 }) {
   return (
@@ -92,20 +106,42 @@ function ReaderSurface({
               Read in a cleaner study view with calmer spacing, stronger hierarchy, and fewer PDF-style distractions.
             </CardDescription>
           </div>
-          <Button variant="secondary" onClick={onToggleFullscreen}>
-            {isFullscreen ? (
-              <>
-                <Minimize2 className="size-4" />
-                Exit full screen
-              </>
-            ) : (
-              <>
-                <Expand className="size-4" />
-                Full screen
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onToggleHighlights}>
+              {showHighlights ? (
+                <>
+                  <EyeOff className="size-4" />
+                  Hide highlights
+                </>
+              ) : (
+                <>
+                  <Eye className="size-4" />
+                  Show highlights
+                </>
+              )}
+            </Button>
+            <Button variant="secondary" onClick={onToggleFullscreen}>
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="size-4" />
+                  Exit full screen
+                </>
+              ) : (
+                <>
+                  <Expand className="size-4" />
+                  Full screen
+                </>
+              )}
+            </Button>
+          </div>
         </div>
+        {showHighlights ? (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <LegendPill type="key_idea" label="Key idea" />
+            <LegendPill type="definition" label="Definition" />
+            <LegendPill type="example" label="Example" />
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className={isFullscreen ? "flex-1 overflow-hidden p-0" : "p-0"}>
         {isLoading ? (
@@ -130,16 +166,65 @@ function ReaderSurface({
                     </h2>
                   </div>
 
+                  {showHighlights && section.highlights.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {section.highlights.map((highlight, index) => (
+                        <span
+                          key={`${section.id}-highlight-${index}`}
+                          className={highlightBadgeClass(highlight.type)}
+                        >
+                          {highlightLabel(highlight.type)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
                   <div className="space-y-6">
                     {section.paragraphs.map((paragraph, index) => (
                       <p
                         key={`${section.id}-${index}`}
                         className="text-[1.02rem] leading-9 text-[rgba(52,52,47,0.92)] md:text-[1.08rem]"
                       >
-                        {paragraph}
+                        {splitParagraphIntoSentences(paragraph).map((sentence, sentenceIndex, all) => {
+                          const highlightType = showHighlights
+                            ? resolveSentenceHighlight(sentence, section.highlights)
+                            : null;
+
+                          return (
+                            <span
+                              key={`${section.id}-${index}-${sentenceIndex}`}
+                              className={highlightType ? highlightSentenceClass(highlightType) : undefined}
+                            >
+                              {sentence}
+                              {sentenceIndex < all.length - 1 ? " " : ""}
+                            </span>
+                          );
+                        })}
                       </p>
                     ))}
                   </div>
+
+                  {section.summaryBullets.length > 0 ? (
+                    <div className="rounded-[22px] border border-[rgba(194,200,190,0.42)] bg-[rgba(133,165,121,0.08)] p-5">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="size-4 text-[var(--primary)]" />
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
+                          Section summary
+                        </p>
+                      </div>
+                      <ul className="mt-4 space-y-3">
+                        {section.summaryBullets.map((item) => (
+                          <li
+                            key={`${section.id}-summary-${item.slice(0, 32)}`}
+                            className="flex items-start gap-3 text-sm leading-7 text-[var(--muted-foreground)]"
+                          >
+                            <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
@@ -148,4 +233,56 @@ function ReaderSurface({
       </CardContent>
     </Card>
   );
+}
+
+function LegendPill({
+  label,
+  type,
+}: {
+  label: string;
+  type: ReaderHighlightType;
+}) {
+  return <span className={highlightBadgeClass(type)}>{label}</span>;
+}
+
+function highlightLabel(type: ReaderHighlightType) {
+  if (type === "definition") {
+    return "Definition";
+  }
+
+  if (type === "example") {
+    return "Example";
+  }
+
+  return "Key idea";
+}
+
+function highlightBadgeClass(type: ReaderHighlightType) {
+  const shared =
+    "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]";
+
+  if (type === "definition") {
+    return `${shared} border-sky-300/55 bg-sky-400/12 text-sky-800`;
+  }
+
+  if (type === "example") {
+    return `${shared} border-emerald-300/55 bg-emerald-400/12 text-emerald-800`;
+  }
+
+  return `${shared} border-amber-300/60 bg-amber-300/18 text-amber-900`;
+}
+
+function highlightSentenceClass(type: ReaderHighlightType) {
+  const shared =
+    "rounded-md px-1.5 py-0.5 transition-colors";
+
+  if (type === "definition") {
+    return `${shared} bg-sky-200/65 text-slate-900`;
+  }
+
+  if (type === "example") {
+    return `${shared} bg-emerald-200/65 text-slate-900`;
+  }
+
+  return `${shared} bg-amber-200/70 text-slate-900`;
 }

@@ -99,6 +99,63 @@ Return JSON only with these keys:
     }
 
 
+def generate_reader_guide(
+    *,
+    document_title: str,
+    source_text: str,
+    settings: Settings,
+) -> dict[str, Any]:
+    fallback = _build_reader_guide_fallback(source_text)
+
+    if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+        return fallback
+
+    clipped_source = source_text.strip()[:14000]
+    prompt = f"""
+Create a guided reading companion for this study document.
+
+Document title:
+{document_title}
+
+Source:
+{clipped_source}
+
+Return JSON only with these keys:
+- key_terms
+- important_sentences
+- sections
+
+Rules:
+- "key_terms" should be 4 to 8 objects with:
+  - term
+  - definition
+- "important_sentences" should be 4 to 8 concise, high-value sentences from the source.
+- "sections" should be an array of objects with:
+  - heading
+  - summary_bullets
+  - highlights
+- Each "summary_bullets" list should contain 2 to 4 bullets.
+- Each "highlights" list should contain up to 4 objects with:
+  - type (key_idea, definition, example)
+  - text
+- Keep everything concise, readable, and useful for active studying.
+"""
+
+    try:
+        content = _chat_json(
+            settings=settings,
+            system_prompt=(
+                "You prepare reading guides that help learners focus on important ideas"
+                " without over-explaining the whole document."
+            ),
+            user_prompt=prompt,
+        )
+        payload = _parse_json_payload(content)
+        return _normalize_reader_guide(payload, fallback)
+    except Exception:
+        return fallback
+
+
 def generate_notes(
     *,
     transcript: str,
@@ -183,6 +240,47 @@ Formatting requirements:
     }
 
 
+def _normalize_reader_guide(
+    payload: dict[str, Any],
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    fallback_sections = _reader_sections(fallback.get("sections"))
+    payload_sections = _reader_sections(payload.get("sections"))
+    merged_sections: list[dict[str, Any]] = []
+
+    if payload_sections:
+        for index, fallback_section in enumerate(fallback_sections):
+            payload_section = payload_sections[index] if index < len(payload_sections) else {}
+            summary_bullets = _string_list(payload_section.get("summary_bullets"))
+            highlights = _reader_highlights(payload_section.get("highlights"))
+
+            merged_sections.append(
+                {
+                    "heading": str(
+                        payload_section.get("heading") or fallback_section.get("heading") or ""
+                    ).strip()
+                    or fallback_section.get("heading")
+                    or f"Section {index + 1}",
+                    "summary_bullets": summary_bullets
+                    or _string_list(fallback_section.get("summary_bullets")),
+                    "highlights": highlights
+                    or _reader_highlights(fallback_section.get("highlights")),
+                }
+            )
+    else:
+        merged_sections = fallback_sections
+
+    key_terms = _reader_terms(payload.get("key_terms"))
+    important_sentences = _string_list(payload.get("important_sentences"))
+
+    return {
+        "key_terms": key_terms or _reader_terms(fallback.get("key_terms")),
+        "important_sentences": important_sentences
+        or _string_list(fallback.get("important_sentences")),
+        "sections": merged_sections or fallback_sections,
+    }
+
+
 def _chat_json(*, settings: Settings, system_prompt: str, user_prompt: str) -> str:
     client = _create_client(settings)
     response = client.chat.completions.create(
@@ -241,6 +339,71 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _reader_terms(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    terms: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+
+        term = str(item.get("term") or "").strip()
+        definition = str(item.get("definition") or "").strip()
+        if not term or not definition:
+            continue
+
+        terms.append({"term": term, "definition": definition})
+
+    return terms[:8]
+
+
+def _reader_highlights(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+
+    highlights: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+
+        highlight_type = str(item.get("type") or "").strip().lower()
+        text = str(item.get("text") or "").strip()
+        if highlight_type not in {"key_idea", "definition", "example"} or not text:
+            continue
+
+        highlights.append({"type": highlight_type, "text": text})
+
+    return highlights[:6]
+
+
+def _reader_sections(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+
+    sections: list[dict[str, Any]] = []
+    for index, item in enumerate(value, start=1):
+        if not isinstance(item, dict):
+            continue
+
+        heading = str(item.get("heading") or item.get("title") or "").strip()
+        summary_bullets = _string_list(item.get("summary_bullets"))
+        highlights = _reader_highlights(item.get("highlights"))
+
+        if not heading and not summary_bullets and not highlights:
+            continue
+
+        sections.append(
+            {
+                "heading": heading or f"Section {index}",
+                "summary_bullets": summary_bullets[:4],
+                "highlights": highlights,
+            }
+        )
+
+    return sections
 
 
 def _note_sections(value: Any) -> list[dict[str, Any]]:
@@ -306,3 +469,122 @@ def _compose_note_content(
         chunks.append(fallback.strip())
 
     return "\n\n".join(chunk for chunk in chunks if chunk.strip())
+
+
+def _build_reader_guide_fallback(source_text: str) -> dict[str, Any]:
+    paragraphs = _reader_paragraphs(source_text)
+    sections = _heuristic_reader_sections(paragraphs)
+    all_sentences = _top_sentences(paragraphs, limit=8)
+
+    return {
+        "key_terms": _heuristic_key_terms(paragraphs),
+        "important_sentences": all_sentences,
+        "sections": sections,
+    }
+
+
+def _reader_paragraphs(source_text: str) -> list[str]:
+    return [
+        block.replace("\n", " ").strip()
+        for block in source_text.replace("\r\n", "\n").split("\n\n")
+        if block.strip()
+    ]
+
+
+def _heuristic_reader_sections(paragraphs: list[str]) -> list[dict[str, Any]]:
+    if not paragraphs:
+        return []
+
+    chunk_size = 2 if len(paragraphs) <= 6 else 3
+    sections: list[dict[str, Any]] = []
+    for index in range(0, len(paragraphs), chunk_size):
+        chunk = paragraphs[index : index + chunk_size]
+        section_number = len(sections) + 1
+        heading = _derive_section_heading(chunk, section_number)
+        summary_bullets = _top_sentences(chunk, limit=3)
+        highlights = _heuristic_highlights(chunk)
+        sections.append(
+            {
+                "heading": heading,
+                "summary_bullets": summary_bullets,
+                "highlights": highlights,
+            }
+        )
+
+    return sections
+
+
+def _derive_section_heading(paragraphs: list[str], section_number: int) -> str:
+    first_sentence = _split_sentences(paragraphs[0])[0] if paragraphs else ""
+    cleaned = re.sub(r"^[\d.\-)\s]+", "", first_sentence).strip()
+    if cleaned:
+        words = cleaned.split()
+        return " ".join(words[:6]).rstrip(",:;") or f"Section {section_number}"
+    return f"Section {section_number}"
+
+
+def _heuristic_highlights(paragraphs: list[str]) -> list[dict[str, str]]:
+    sentences = _top_sentences(paragraphs, limit=6)
+    highlights: list[dict[str, str]] = []
+
+    for sentence in sentences:
+        lowered = sentence.lower()
+        if any(keyword in lowered for keyword in (" is ", " refers to ", " means ", " defined as ")):
+            highlights.append({"type": "definition", "text": sentence})
+        elif any(keyword in lowered for keyword in ("for example", "for instance", "such as", "e.g.")):
+            highlights.append({"type": "example", "text": sentence})
+        else:
+            highlights.append({"type": "key_idea", "text": sentence})
+
+        if len(highlights) >= 4:
+            break
+
+    return highlights
+
+
+def _heuristic_key_terms(paragraphs: list[str]) -> list[dict[str, str]]:
+    candidates: list[dict[str, str]] = []
+
+    for paragraph in paragraphs:
+        for sentence in _split_sentences(paragraph):
+            match = re.match(
+                r"([A-Z][A-Za-z0-9'/-]*(?:\s+[A-Z][A-Za-z0-9'/-]*){0,3})\s+(?:is|are|refers to|means|describes)\s+(.+)",
+                sentence,
+            )
+            if not match:
+                continue
+
+            term = match.group(1).strip(" .,:;")
+            definition = match.group(2).strip(" .,:;")
+            if term and definition:
+                candidates.append({"term": term, "definition": definition})
+
+    deduped: list[dict[str, str]] = []
+    seen_terms: set[str] = set()
+    for item in candidates:
+        term_key = item["term"].lower()
+        if term_key in seen_terms:
+            continue
+        seen_terms.add(term_key)
+        deduped.append(item)
+        if len(deduped) >= 6:
+            break
+
+    return deduped
+
+
+def _top_sentences(paragraphs: list[str], limit: int) -> list[str]:
+    sentences: list[str] = []
+    for paragraph in paragraphs:
+        for sentence in _split_sentences(paragraph):
+            if len(sentence.split()) < 6:
+                continue
+            sentences.append(sentence)
+            if len(sentences) >= limit:
+                return sentences
+    return sentences
+
+
+def _split_sentences(value: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+", value.strip())
+    return [part.strip() for part in parts if part.strip()]

@@ -55,14 +55,21 @@ def init_db() -> None:
 
 def _run_lightweight_migrations() -> None:
     inspector = inspect(engine)
-    if "app_users" not in inspector.get_table_names():
-        return
-
-    user_columns = {column["name"] for column in inspector.get_columns("app_users")}
-    if "password_hash" in user_columns:
-        return
+    table_names = set(inspector.get_table_names())
 
     with engine.begin() as connection:
-        connection.exec_driver_sql(
-            "ALTER TABLE app_users ADD COLUMN password_hash VARCHAR(255)"
-        )
+        if "app_users" in table_names:
+            user_columns = {column["name"] for column in inspector.get_columns("app_users")}
+            if "password_hash" not in user_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE app_users ADD COLUMN password_hash VARCHAR(255)"
+                )
+
+        if "app_documents" in table_names:
+            document_columns = {
+                column["name"] for column in inspector.get_columns("app_documents")
+            }
+            if "reader_json" not in document_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE app_documents ADD COLUMN reader_json JSON"
+                )

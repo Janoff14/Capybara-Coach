@@ -112,6 +112,34 @@ class PipelineApiTests(unittest.TestCase):
         with (
             patch("app.api.routes.documents.upload_bytes", side_effect=self._fake_upload),
             patch("app.api.routes.documents.download_bytes", side_effect=self._fake_download),
+            patch(
+                "app.api.routes.documents.generate_reader_guide",
+                return_value={
+                    "key_terms": [
+                        {
+                            "term": "Newton's first law",
+                            "definition": "Objects keep their state of motion unless a force changes it.",
+                        }
+                    ],
+                    "important_sentences": [
+                        "Newton's first law says an object stays at rest or moves uniformly unless acted on by a force."
+                    ],
+                    "sections": [
+                        {
+                            "heading": "Core principle",
+                            "summary_bullets": [
+                                "Objects stay at rest or move uniformly without a net force."
+                            ],
+                            "highlights": [
+                                {
+                                    "type": "key_idea",
+                                    "text": "Newton's first law says an object stays at rest or moves uniformly unless acted on by a force.",
+                                }
+                            ],
+                        }
+                    ],
+                },
+            ),
             patch("app.api.routes.sessions.upload_bytes", side_effect=self._fake_upload),
             patch("app.api.routes.sessions.download_bytes", side_effect=self._fake_download),
             patch(
@@ -156,6 +184,7 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(document_response.status_code, 201)
             document = document_response.json()
             self.assertIn("Newton's first law", document["extracted_text"])
+            self.assertEqual(document["reader_json"]["sections"][0]["heading"], "Core principle")
 
             document_file_response = self.client.get(
                 f"/documents/{document['id']}/file",

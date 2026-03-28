@@ -21,10 +21,35 @@ export type DocumentRead = {
   storage_bucket: string;
   storage_path: string;
   extracted_text: string;
+  reader_json: ReaderGuideJson | null;
   page_count: number;
   created_at: string;
   updated_at: string;
 };
+
+export type ReaderHighlightType = "key_idea" | "definition" | "example";
+
+export type ReaderHighlight = {
+  type: ReaderHighlightType;
+  text: string;
+};
+
+export type ReaderGuideSection = {
+  heading: string;
+  summary_bullets?: string[];
+  highlights?: ReaderHighlight[];
+};
+
+export type ReaderKeyTerm = {
+  term: string;
+  definition: string;
+};
+
+export type ReaderGuideJson = {
+  key_terms?: ReaderKeyTerm[];
+  important_sentences?: string[];
+  sections?: ReaderGuideSection[];
+} & Record<string, unknown>;
 
 export type NoteRead = {
   id: string;

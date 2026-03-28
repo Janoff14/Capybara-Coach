@@ -1,14 +1,104 @@
+import type {
+  ReaderGuideJson,
+  ReaderGuideSection,
+  ReaderHighlight,
+  ReaderHighlightType,
+  ReaderKeyTerm,
+} from "@/lib/types";
+
 export type ReaderSection = {
   id: string;
   label: string;
   title: string;
   preview: string;
   paragraphs: string[];
+  summaryBullets: string[];
+  highlights: ReaderHighlight[];
+};
+
+export type ReaderGuideView = {
+  sections: ReaderSection[];
+  keyTerms: ReaderKeyTerm[];
+  importantSentences: string[];
+};
+
+type NormalizedGuideSection = {
+  heading: string;
+  summaryBullets: string[];
+  highlights: ReaderHighlight[];
 };
 
 const SENTENCE_END_RE = /(?<=[.!?])\s+/;
 
-export function buildReaderSections(text: string): ReaderSection[] {
+export function buildReaderGuide(
+  text: string,
+  readerJson: ReaderGuideJson | null | undefined,
+): ReaderGuideView {
+  const baseSections = buildBaseSections(text);
+  const guideSections = normalizeGuideSections(readerJson?.sections);
+
+  const sections = baseSections.map((section, index) => {
+    const guideSection = guideSections[index];
+    return {
+      ...section,
+      title: guideSection?.heading || section.title,
+      preview: guideSection?.summaryBullets?.[0] || section.preview,
+      summaryBullets:
+        guideSection?.summaryBullets?.length
+          ? guideSection.summaryBullets
+          : buildFallbackSummary(section.paragraphs),
+      highlights: guideSection?.highlights ?? buildFallbackHighlights(section.paragraphs),
+    };
+  });
+
+  return {
+    sections,
+    keyTerms: normalizeKeyTerms(readerJson?.key_terms),
+    importantSentences: normalizeStringArray(readerJson?.important_sentences),
+  };
+}
+
+export function estimateReadingMinutes(text: string) {
+  const wordCount = text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+  if (wordCount === 0) {
+    return 0;
+  }
+
+  return Math.max(1, Math.ceil(wordCount / 220));
+}
+
+export function splitParagraphIntoSentences(paragraph: string) {
+  return paragraph
+    .split(SENTENCE_END_RE)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+export function resolveSentenceHighlight(
+  sentence: string,
+  highlights: ReaderHighlight[],
+): ReaderHighlightType | null {
+  const normalizedSentence = normalizeText(sentence);
+  for (const highlight of highlights) {
+    const normalizedHighlight = normalizeText(highlight.text);
+    if (
+      normalizedHighlight &&
+      normalizedSentence &&
+      (normalizedSentence.includes(normalizedHighlight) ||
+        normalizedHighlight.includes(normalizedSentence))
+    ) {
+      return highlight.type;
+    }
+  }
+
+  return null;
+}
+
+function buildBaseSections(text: string): ReaderSection[] {
   const normalized = text.replace(/\r\n/g, "\n").trim();
   if (!normalized) {
     return [];
@@ -35,6 +125,8 @@ export function buildReaderSections(text: string): ReaderSection[] {
       title: currentTitle,
       preview: buildPreview(currentParagraphs),
       paragraphs: currentParagraphs,
+      summaryBullets: buildFallbackSummary(currentParagraphs),
+      highlights: buildFallbackHighlights(currentParagraphs),
     });
 
     sectionIndex += 1;
@@ -65,17 +157,57 @@ export function buildReaderSections(text: string): ReaderSection[] {
   return sections;
 }
 
-export function estimateReadingMinutes(text: string) {
-  const wordCount = text
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
-
-  if (wordCount === 0) {
-    return 0;
+function normalizeGuideSections(value: ReaderGuideSection[] | undefined): NormalizedGuideSection[] {
+  if (!Array.isArray(value)) {
+    return [];
   }
 
-  return Math.max(1, Math.ceil(wordCount / 220));
+  return value
+    .map((section) => ({
+      heading: String(section.heading || "").trim(),
+      summaryBullets: normalizeStringArray(section.summary_bullets).slice(0, 4),
+      highlights: normalizeHighlights(section.highlights),
+    }))
+    .filter(
+      (section) =>
+        section.heading || section.summaryBullets.length > 0 || section.highlights.length > 0,
+    );
+}
+
+function normalizeKeyTerms(value: ReaderGuideJson["key_terms"]): ReaderKeyTerm[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => ({
+      term: String(item.term || "").trim(),
+      definition: String(item.definition || "").trim(),
+    }))
+    .filter((item) => item.term && item.definition)
+    .slice(0, 8);
+}
+
+function normalizeHighlights(value: ReaderGuideSection["highlights"]): ReaderHighlight[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => ({
+      type: item.type,
+      text: String(item.text || "").trim(),
+    }))
+    .filter((item) => item.text)
+    .slice(0, 6);
+}
+
+function normalizeStringArray(value: string[] | undefined): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item) => String(item).trim()).filter(Boolean);
 }
 
 function looksLikeHeading(block: string) {
@@ -130,8 +262,56 @@ function chunkDenseContent(blocks: string[]): ReaderSection[] {
       title: sectionNumber === 1 ? "Opening ideas" : `Core ideas ${sectionNumber}`,
       preview: buildPreview(paragraphs),
       paragraphs,
+      summaryBullets: buildFallbackSummary(paragraphs),
+      highlights: buildFallbackHighlights(paragraphs),
     });
   }
 
   return sections;
+}
+
+function buildFallbackSummary(paragraphs: string[]) {
+  return paragraphs
+    .flatMap((paragraph) => splitParagraphIntoSentences(paragraph))
+    .filter((sentence) => sentence.split(/\s+/).length >= 6)
+    .slice(0, 3);
+}
+
+function buildFallbackHighlights(paragraphs: string[]): ReaderHighlight[] {
+  const sentences = paragraphs
+    .flatMap((paragraph) => splitParagraphIntoSentences(paragraph))
+    .filter((sentence) => sentence.split(/\s+/).length >= 6)
+    .slice(0, 4);
+
+  return sentences.map((sentence) => ({
+    type: inferHighlightType(sentence),
+    text: sentence,
+  }));
+}
+
+function inferHighlightType(sentence: string): ReaderHighlightType {
+  const lowered = sentence.toLowerCase();
+  if (
+    lowered.includes(" is ") ||
+    lowered.includes(" refers to ") ||
+    lowered.includes(" means ") ||
+    lowered.includes(" defined as ")
+  ) {
+    return "definition";
+  }
+
+  if (
+    lowered.includes("for example") ||
+    lowered.includes("for instance") ||
+    lowered.includes("such as") ||
+    lowered.includes("e.g.")
+  ) {
+    return "example";
+  }
+
+  return "key_idea";
+}
+
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 }
