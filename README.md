@@ -1,60 +1,138 @@
-# Capybara Coach Web
+# Capybara Coach
 
-Capybara Coach is now a web-first study pipeline with:
+Capybara Coach is an early-stage study app built around active recall instead of passive rereading.
 
-- Next.js frontend at the repo root
-- FastAPI backend in [backend](C:/Users/sanja/Shoki/backend)
-- Supabase Storage for documents and audio
-- Railway-hosted API
-- Vercel-ready frontend
+The current product flow is simple: upload a PDF, read it in-app, switch into recall mode, explain the material from memory, get an AI-assisted assessment, then turn the result into notes, flashcards, and review sessions.
 
-## Frontend stack
+Live demo: [https://capybara-coach-web.vercel.app/](https://capybara-coach-web.vercel.app/)
+
+## What It Does
+
+- Upload PDF study material
+- Extract and store document text
+- Start study sessions from uploaded documents
+- Read the source in a guided reader mode
+- Record a spoken recall attempt from memory
+- Transcribe and assess the explanation
+- Generate notes from the assessed session
+- Generate flashcards for practice
+- Track review cadence with simple spaced review grading
+
+## How It Works
+
+1. Create an account and sign in.
+2. Upload a PDF in the Documents area.
+3. Start a study session for that document.
+4. Read the source inside the app with lightweight guidance.
+5. Move into Recall mode and explain the material out loud from memory.
+6. Upload the recording for transcription and assessment.
+7. Review the score, gaps, strengths, and next-step feedback.
+8. Generate notes and flashcards from the session.
+9. Revisit the flashcards in Practice and grade how difficult the review felt.
+
+## Current Status
+
+This project is still in the early stages.
+
+It already demonstrates the core study loop well, but it still needs a lot of refinement before it feels complete. There are rough edges in the UX, more reliability work to do across the pipeline, and plenty of missing features that would make the product more useful day to day.
+
+Some obvious next areas are:
+
+- more polished onboarding and empty states
+- better session history and progress tracking
+- stronger note editing and export options
+- richer flashcard generation and deck controls
+- more robust review scheduling
+- better mobile responsiveness
+- broader document support beyond the current MVP path
+- more production hardening around uploads, audio handling, and evaluation
+
+## Tech Stack
+
+### Frontend
 
 - Next.js App Router
+- React
 - TypeScript
 - Tailwind CSS
-- shadcn-style UI primitives
 - TanStack Query
-- React Hook Form + Zod
+- React Hook Form
+- Zod
 
-## Main user flow
+### Backend
 
-1. Register or log in
-2. Upload a PDF
-3. Start a study session
-4. Read the source in the browser
-5. Record an explanation
-6. Transcribe and assess it
-7. Generate and save notes
+- FastAPI
+- SQLAlchemy
+- JWT auth
+- Supabase Storage
+- Azure OpenAI for transcription and evaluation
 
-## Local frontend setup
+## Screenshots
 
-1. Copy [.env.example](C:/Users/sanja/Shoki/.env.example) to `.env.local`
-2. Set `NEXT_PUBLIC_API_BASE_URL`
-3. Install dependencies:
+### Dashboard
+
+![Dashboard](./artifacts/stitch-redesign/screenshots-2026-03-29/03-dashboard.png)
+
+### Documents
+
+![Documents](./artifacts/stitch-redesign/screenshots-2026-03-29/04-documents.png)
+
+### Reader Mode
+
+![Reader Mode](./artifacts/stitch-redesign/screenshots-2026-03-29/05-reader.png)
+
+### Recall Mode
+
+![Recall Mode](./artifacts/stitch-redesign/screenshots-2026-03-29/06-recall.png)
+
+### Assessment
+
+![Assessment](./artifacts/stitch-redesign/screenshots-2026-03-29/07-assessment.png)
+
+### Practice
+
+![Practice](./artifacts/stitch-redesign/screenshots-2026-03-29/10-practice.png)
+
+## Local Development
+
+### Frontend
 
 ```powershell
-npm.cmd install
+npm install
+npm run dev
 ```
 
-4. Start the frontend:
+Create `.env.local` in the repo root:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+### Backend
+
+From `backend/`:
 
 ```powershell
-npm.cmd run dev
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_local.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
 ```
 
-The app runs on `http://localhost:3000`.
+Copy `backend/.env.example` to `backend/.env` and fill in the required values for:
 
-## Frontend checks
+- database
+- JWT auth
+- Supabase storage
+- Azure OpenAI
 
-```powershell
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd run build
+## Repo Layout
+
+```text
+.
+├─ app/         Next.js routes
+├─ components/  UI and app components
+├─ hooks/       Frontend hooks
+├─ lib/         Shared frontend utilities and API client
+├─ backend/     FastAPI API and backend services
+├─ docs/        Project notes
+└─ artifacts/   Screenshots and design artifacts
 ```
-
-## Backend
-
-The backend lives in [backend](C:/Users/sanja/Shoki/backend). See [backend/README.md](C:/Users/sanja/Shoki/backend/README.md) for setup, env vars, and deployment notes.
-
-For local end-to-end work, run the backend first and make sure `NEXT_PUBLIC_API_BASE_URL` points to it.
