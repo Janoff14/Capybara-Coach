@@ -1,138 +1,92 @@
 # Capybara Coach
 
-Capybara Coach is an early-stage study app built around active recall instead of passive rereading.
+Learn faster by **explaining, not rereading**.
 
-The current product flow is simple: upload a PDF, read it in-app, switch into recall mode, explain the material from memory, get an AI-assisted assessment, then turn the result into notes, flashcards, and review sessions.
+Capybara Coach is a study app built around active recall.  
+Instead of passively going through material, you read once, explain it from memory, and get feedback on what you actually understood.
 
-Live demo: [https://capybara-coach-web.vercel.app/](https://capybara-coach-web.vercel.app/)
+👉 Live demo: https://capybara-coach-web.vercel.app/
 
-## What It Does
+---
 
-- Upload PDF study material
-- Extract and store document text
-- Start study sessions from uploaded documents
-- Read the source in a guided reader mode
-- Record a spoken recall attempt from memory
-- Transcribe and assess the explanation
-- Generate notes from the assessed session
-- Generate flashcards for practice
-- Track review cadence with simple spaced review grading
+## 🚀 How it works
 
-## How It Works
+1. Upload your study material (PDF)
+2. Read it inside the app
+3. Explain it from memory (voice)
+4. Get AI feedback on gaps and understanding
+5. Turn that into notes and flashcards
+6. Come back later and review
 
-1. Create an account and sign in.
-2. Upload a PDF in the Documents area.
-3. Start a study session for that document.
-4. Read the source inside the app with lightweight guidance.
-5. Move into Recall mode and explain the material out loud from memory.
-6. Upload the recording for transcription and assessment.
-7. Review the score, gaps, strengths, and next-step feedback.
-8. Generate notes and flashcards from the session.
-9. Revisit the flashcards in Practice and grade how difficult the review felt.
+Simple loop. Repeat until it sticks.
 
-## Current Status
+---
 
-This project is still in the early stages.
+## 🧠 What you can do
 
-It already demonstrates the core study loop well, but it still needs a lot of refinement before it feels complete. There are rough edges in the UX, more reliability work to do across the pipeline, and plenty of missing features that would make the product more useful day to day.
+- Upload and manage study documents  
+- Run structured study sessions  
+- Record voice explanations (active recall)  
+- Get AI-based assessment of your understanding  
+- Generate notes from your explanations  
+- Generate flashcards for review  
+- Practice with basic spaced repetition  
 
-Some obvious next areas are:
+---
 
-- more polished onboarding and empty states
-- better session history and progress tracking
-- stronger note editing and export options
-- richer flashcard generation and deck controls
-- more robust review scheduling
-- better mobile responsiveness
-- broader document support beyond the current MVP path
-- more production hardening around uploads, audio handling, and evaluation
+## ⚠️ Current state
 
-## Tech Stack
+This is an early working version.
 
-### Frontend
+- Core learning loop is functional  
+- UX is still rough in places  
+- Some features are incomplete or unstable  
 
-- Next.js App Router
-- React
-- TypeScript
-- Tailwind CSS
-- TanStack Query
-- React Hook Form
-- Zod
+It’s more of a **working system** than a polished product right now.
 
-### Backend
+---
 
+## 🎯 Direction
+
+The goal is to replace passive studying with:
+
+- forced recall  
+- real understanding  
+- structured repetition  
+
+Planned improvements:
+
+- better progress tracking  
+- stronger flashcards & scheduling  
+- cleaner UX and onboarding  
+- more reliable audio + evaluation pipeline  
+
+---
+
+## 🛠 Tech
+
+**Frontend**
+- Next.js (App Router)
+- React + TypeScript
+- Tailwind
+
+**Backend**
 - FastAPI
-- SQLAlchemy
-- JWT auth
+- PostgreSQL (via SQLAlchemy)
 - Supabase Storage
-- Azure OpenAI for transcription and evaluation
+- Azure OpenAI (speech + evaluation)
 
+---
 ## Screenshots
 
-### Dashboard
+<img width="1919" height="978" alt="image" src="https://github.com/user-attachments/assets/9bbe147c-d344-4b31-be25-446732d67881" />
 
-![Dashboard](./artifacts/stitch-redesign/screenshots-2026-03-29/03-dashboard.png)
+<img width="1919" height="988" alt="image" src="https://github.com/user-attachments/assets/5f2b17ed-beef-4727-b16b-87472baa2da5" />
 
-### Documents
+<img width="1919" height="993" alt="image" src="https://github.com/user-attachments/assets/baef6873-9b88-45e5-9e25-4a8cae3c277c" />
 
-![Documents](./artifacts/stitch-redesign/screenshots-2026-03-29/04-documents.png)
+<img width="1919" height="985" alt="image" src="https://github.com/user-attachments/assets/cc387145-f02c-4ef6-80ae-df9a7b81a9dd" />
 
-### Reader Mode
+<img width="1919" height="992" alt="image" src="https://github.com/user-attachments/assets/8e5524f1-f3ca-438e-b3ba-02ee9667c4c4" />
 
-![Reader Mode](./artifacts/stitch-redesign/screenshots-2026-03-29/05-reader.png)
-
-### Recall Mode
-
-![Recall Mode](./artifacts/stitch-redesign/screenshots-2026-03-29/06-recall.png)
-
-### Assessment
-
-![Assessment](./artifacts/stitch-redesign/screenshots-2026-03-29/07-assessment.png)
-
-### Practice
-
-![Practice](./artifacts/stitch-redesign/screenshots-2026-03-29/10-practice.png)
-
-## Local Development
-
-### Frontend
-
-```powershell
-npm install
-npm run dev
-```
-
-Create `.env.local` in the repo root:
-
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-### Backend
-
-From `backend/`:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup_local.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
-```
-
-Copy `backend/.env.example` to `backend/.env` and fill in the required values for:
-
-- database
-- JWT auth
-- Supabase storage
-- Azure OpenAI
-
-## Repo Layout
-
-```text
-.
-├─ app/         Next.js routes
-├─ components/  UI and app components
-├─ hooks/       Frontend hooks
-├─ lib/         Shared frontend utilities and API client
-├─ backend/     FastAPI API and backend services
-├─ docs/        Project notes
-└─ artifacts/   Screenshots and design artifacts
-```
+<img width="1919" height="990" alt="image" src="https://github.com/user-attachments/assets/0cc2e533-e2db-46be-82d0-a94138932e86" />
