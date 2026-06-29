@@ -9,16 +9,22 @@ import {
   useReducer,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { api } from "@/lib/api";
+import { api, isAuthenticationError } from "@/lib/api";
 import type { AuthUser, TokenResponse } from "@/lib/types";
 
-type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+type AuthStatus =
+  | "loading"
+  | "authenticated"
+  | "unauthenticated"
+  | "unavailable";
 
 type AuthContextValue = {
   status: AuthStatus;
   token: string | null;
   user: AuthUser | null;
+  authError: string | null;
   authenticate: (payload: TokenResponse) => void;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;
@@ -31,18 +37,21 @@ type AuthState = {
   status: AuthStatus;
   token: string | null;
   user: AuthUser | null;
+  authError: string | null;
 };
 
 type AuthAction =
   | { type: "authenticate"; payload: TokenResponse }
   | { type: "logout" }
   | { type: "loading"; token: string }
+  | { type: "unavailable"; token: string; message: string }
   | { type: "user"; token: string; user: AuthUser };
 
 const INITIAL_STATE: AuthState = {
   status: "loading",
   token: null,
   user: null,
+  authError: null,
 };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
@@ -52,24 +61,35 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         status: "authenticated",
         token: action.payload.access_token,
         user: action.payload.user,
+        authError: null,
       };
     case "loading":
       return {
         ...state,
         status: "loading",
         token: action.token,
+        authError: null,
       };
     case "user":
       return {
         status: "authenticated",
         token: action.token,
         user: action.user,
+        authError: null,
+      };
+    case "unavailable":
+      return {
+        status: "unavailable",
+        token: action.token,
+        user: null,
+        authError: action.message,
       };
     case "logout":
       return {
         status: "unauthenticated",
         token: null,
         user: null,
+        authError: null,
       };
     default:
       return state;
@@ -77,7 +97,8 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [{ status, token, user }, dispatch] = useReducer(
+  const queryClient = useQueryClient();
+  const [{ authError, status, token, user }, dispatch] = useReducer(
     authReducer,
     INITIAL_STATE,
   );
@@ -86,13 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(AUTH_STORAGE_KEY);
     }
+    queryClient.clear();
     dispatch({ type: "logout" });
-  }, []);
+  }, [queryClient]);
 
   const authenticate = useCallback((payload: TokenResponse) => {
     window.localStorage.setItem(AUTH_STORAGE_KEY, payload.access_token);
+    queryClient.clear();
     dispatch({ type: "authenticate", payload });
-  }, []);
+  }, [queryClient]);
 
   const refreshUser = useCallback(async () => {
     const persistedToken = token ?? window.localStorage.getItem(AUTH_STORAGE_KEY);
@@ -102,12 +125,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
+    dispatch({ type: "loading", token: persistedToken });
+
     try {
       const nextUser = await api.getMe(persistedToken);
       dispatch({ type: "user", token: persistedToken, user: nextUser });
       return nextUser;
-    } catch {
-      logout();
+    } catch (error) {
+      if (isAuthenticationError(error)) {
+        logout();
+        return null;
+      }
+
+      dispatch({
+        type: "unavailable",
+        token: persistedToken,
+        message:
+          error instanceof Error
+            ? error.message
+            : "The study service is temporarily unavailable.",
+      });
       return null;
     }
   }, [logout, token]);
@@ -130,11 +167,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         dispatch({ type: "user", token: persistedToken, user: nextUser });
-      } catch {
+      } catch (error) {
         if (!isActive) {
           return;
         }
-        logout();
+
+        if (isAuthenticationError(error)) {
+          logout();
+          return;
+        }
+
+        dispatch({
+          type: "unavailable",
+          token: persistedToken,
+          message:
+            error instanceof Error
+              ? error.message
+              : "The study service is temporarily unavailable.",
+        });
       }
     };
 
@@ -150,11 +200,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       token,
       user,
+      authError,
       authenticate,
       logout,
       refreshUser,
     }),
-    [authenticate, logout, refreshUser, status, token, user],
+    [authError, authenticate, logout, refreshUser, status, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

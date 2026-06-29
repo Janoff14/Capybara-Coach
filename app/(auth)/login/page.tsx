@@ -14,7 +14,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, ApiUnavailableError } from "@/lib/api";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address."),
@@ -22,6 +22,18 @@ const loginSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
+
+function getLoginErrorMessage(error: unknown) {
+  if (error instanceof ApiUnavailableError) {
+    return `${error.message} Your credentials were not rejected.`;
+  }
+
+  if (error instanceof ApiError || error instanceof Error) {
+    return error.message;
+  }
+
+  return "Login failed.";
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -45,11 +57,7 @@ export default function LoginPage() {
       router.replace(nextPath);
     },
     onError: (error) => {
-      const message =
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : "Login failed.";
-      toast.error(message);
+      toast.error(getLoginErrorMessage(error));
     },
   });
 
@@ -119,6 +127,15 @@ export default function LoginPage() {
           </label>
           <span className="text-xs text-[var(--muted-foreground)]">JWT access only</span>
         </div>
+
+        {loginMutation.isError ? (
+          <p
+            className="rounded-2xl border border-[rgba(176,69,55,0.24)] bg-[rgba(176,69,55,0.08)] px-4 py-3 text-sm leading-6 text-[var(--danger)]"
+            role="alert"
+          >
+            {getLoginErrorMessage(loginMutation.error)}
+          </p>
+        ) : null}
 
         <Button className="w-full" size="lg" type="submit" disabled={loginMutation.isPending}>
           {loginMutation.isPending ? "Signing in..." : "Sign in"}

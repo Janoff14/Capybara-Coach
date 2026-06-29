@@ -12,10 +12,37 @@ import type {
   UploadDocumentInput,
 } from "@/lib/types";
 
-const DEFAULT_API_BASE_URL = "https://capybara-coach-production.up.railway.app";
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
-).replace(/\/+$/, "");
+const LOCAL_API_BASE_URL = "http://localhost:8000";
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const LONG_REQUEST_TIMEOUT_MS = 120_000;
+
+function resolveApiBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  const candidate =
+    configuredUrl ||
+    (process.env.NODE_ENV === "development" ? LOCAL_API_BASE_URL : "");
+
+  if (!candidate) {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL is required for production builds.",
+    );
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(candidate);
+  } catch {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL must be a valid absolute URL.");
+  }
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL must use http or https.");
+  }
+
+  return parsedUrl.toString().replace(/\/+$/, "");
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 type RequestOptions = {
   method?: string;
@@ -23,6 +50,7 @@ type RequestOptions = {
   body?: BodyInit | null;
   json?: unknown;
   headers?: HeadersInit;
+  timeoutMs?: number;
 };
 
 type ErrorPayload = {
@@ -38,6 +66,19 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+export class ApiUnavailableError extends ApiError {
+  constructor(message: string, status = 0) {
+    super(message, status);
+    this.name = "ApiUnavailableError";
+  }
+}
+
+export function isAuthenticationError(error: unknown) {
+  return (
+    error instanceof ApiError && (error.status === 401 || error.status === 403)
+  );
 }
 
 function buildHeaders(token?: string, headers?: HeadersInit) {
@@ -58,7 +99,8 @@ async function toApiError(response: Response) {
   let message = `Request failed with status ${response.status}.`;
 
   try {
-    const payload = (await response.json()) as ErrorPayload;
+    const responseText = await response.text();
+    const payload = JSON.parse(responseText) as ErrorPayload;
     const detail = payload.detail;
 
     if (typeof detail === "string" && detail.trim()) {
@@ -74,21 +116,50 @@ async function toApiError(response: Response) {
       message = payload.message;
     }
   } catch {
-    try {
-      const fallbackText = await response.text();
-      if (fallbackText.trim()) {
-        message = fallbackText.trim();
-      }
-    } catch {
-      message = response.statusText || message;
-    }
+    message = response.statusText || message;
+  }
+
+  if (
+    response.status >= 500 ||
+    (response.status === 404 && /application not found/i.test(message))
+  ) {
+    return new ApiUnavailableError(
+      "The study service is temporarily unavailable. Please try again shortly.",
+      response.status,
+    );
   }
 
   return new ApiError(message, response.status);
 }
 
+async function fetchWithTimeout(
+  path: string,
+  init: RequestInit,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+) {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const message = controller.signal.aborted
+      ? "The study service took too long to respond. Please try again."
+      : "The study service is unreachable. Check your connection and try again.";
+
+    const unavailableError = new ApiUnavailableError(message);
+    unavailableError.cause = error;
+    throw unavailableError;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+
 async function request<T>(path: string, options: RequestOptions = {}) {
-  const { body, headers, json, method = "GET", token } = options;
+  const { body, headers, json, method = "GET", timeoutMs, token } = options;
   const nextHeaders = buildHeaders(token, headers);
 
   let nextBody = body ?? null;
@@ -98,11 +169,11 @@ async function request<T>(path: string, options: RequestOptions = {}) {
     nextBody = JSON.stringify(json);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(path, {
     method,
     headers: nextHeaders,
     body: nextBody,
-  });
+  }, timeoutMs);
 
   if (!response.ok) {
     throw await toApiError(response);
@@ -116,11 +187,11 @@ async function request<T>(path: string, options: RequestOptions = {}) {
 }
 
 async function requestBlob(path: string, options: RequestOptions = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(path, {
     method: options.method ?? "GET",
     headers: buildHeaders(options.token, options.headers),
     body: options.body ?? null,
-  });
+  }, options.timeoutMs);
 
   if (!response.ok) {
     throw await toApiError(response);
@@ -173,6 +244,7 @@ export const api = {
       method: "POST",
       token,
       body: formData,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 
@@ -207,6 +279,7 @@ export const api = {
       method: "POST",
       token,
       body: formData,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 
@@ -226,6 +299,7 @@ export const api = {
       method: "POST",
       token,
       body: formData,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 
@@ -233,6 +307,7 @@ export const api = {
     return request<StudySessionRead>(`/sessions/${sessionId}/transcribe`, {
       method: "POST",
       token,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 
@@ -242,6 +317,7 @@ export const api = {
       {
       method: "POST",
       token,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
       },
     );
   },
@@ -250,6 +326,7 @@ export const api = {
     return request<StudySessionRead>(`/sessions/${sessionId}/notes`, {
       method: "POST",
       token,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 
@@ -270,6 +347,7 @@ export const api = {
     return request<FlashcardRead[]>(`/sessions/${sessionId}/flashcards`, {
       method: "POST",
       token,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 

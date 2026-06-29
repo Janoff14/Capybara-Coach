@@ -433,6 +433,62 @@ class PipelineApiTests(unittest.TestCase):
             "https://capybara-coach-web.vercel.app",
         )
 
+        local_response = self.client.options(
+            "/auth/login",
+            headers={
+                "Origin": "http://127.0.0.1:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        self.assertEqual(local_response.status_code, 200)
+        self.assertEqual(
+            local_response.headers["access-control-allow-origin"],
+            "http://127.0.0.1:3000",
+        )
+
+    def test_auth_rejects_invalid_credentials_and_tokens(self) -> None:
+        email = f"auth-{uuid4().hex}@example.com"
+        password = "test-password"
+        register_response = self.client.post(
+            "/auth/register",
+            json={"email": email, "password": password, "display_name": "Auth Test"},
+        )
+        self.assertEqual(register_response.status_code, 201)
+
+        invalid_login_response = self.client.post(
+            "/auth/login",
+            json={"email": email, "password": "wrong-password"},
+        )
+        self.assertEqual(invalid_login_response.status_code, 401)
+        self.assertEqual(
+            invalid_login_response.json()["detail"],
+            "Invalid email or password.",
+        )
+
+        invalid_token_response = self.client.get(
+            "/auth/me",
+            headers={"Authorization": "Bearer not-a-valid-token"},
+        )
+        self.assertEqual(invalid_token_response.status_code, 401)
+        self.assertEqual(
+            invalid_token_response.headers["www-authenticate"],
+            "Bearer",
+        )
+
+    def test_cors_rejects_unapproved_origins(self) -> None:
+        response = self.client.options(
+            "/auth/login",
+            headers={
+                "Origin": "https://example.com",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertNotIn("access-control-allow-origin", response.headers)
+
 
 if __name__ == "__main__":
     unittest.main()

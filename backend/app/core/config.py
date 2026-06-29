@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "sqlite:///./capybara_coach.db"
     storage_dir: Path = Path("./storage")
-    cors_allowed_origins: str = "http://localhost:3000"
+    cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     cors_allowed_origin_regex: str = r"https://.*\.vercel\.app"
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
@@ -38,6 +38,24 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.environment.strip().lower() != "production":
+            return self
+
+        problems: list[str] = []
+        if self.database_url.startswith("sqlite"):
+            problems.append("DATABASE_URL must use persistent PostgreSQL")
+        if self.jwt_secret_key == "change-me-in-production" or len(self.jwt_secret_key) < 32:
+            problems.append("JWT_SECRET_KEY must be a unique secret of at least 32 characters")
+        if not self.supabase_url or not self.supabase_key:
+            problems.append("Supabase storage credentials are required")
+
+        if problems:
+            raise ValueError("Invalid production configuration: " + "; ".join(problems))
+
+        return self
 
     @property
     def cors_origins(self) -> list[str]:

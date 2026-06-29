@@ -91,6 +91,7 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 Required env vars:
 
+- `ENVIRONMENT=production`
 - `DATABASE_URL`
 - `CORS_ALLOWED_ORIGINS`
 - `CORS_ALLOWED_ORIGIN_REGEX=https://.*\.vercel\.app`
@@ -104,3 +105,13 @@ Required env vars:
 - `AZURE_OPENAI_API_VERSION=2024-02-01`
 - `AZURE_OPENAI_STT_DEPLOYMENT=gpt-4o-mini-transcribe`
 - `AZURE_OPENAI_TEXT_DEPLOYMENT=gpt-4.1-mini`
+
+The production configuration rejects SQLite, the default JWT secret, short JWT
+secrets, and missing Supabase credentials. Configure the Railway service with:
+
+- Root directory: `/backend`
+- Config file path: `/backend/railway.toml`
+- Persistent PostgreSQL attached through `DATABASE_URL`
+
+The checked-in Railway config builds the Dockerfile, verifies `/health`, and
+restarts failed processes up to three times.
