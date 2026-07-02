@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, FileText, Sparkles } from "lucide-react";
+import { Bookmark, FileText, Mic2, NotebookPen, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
@@ -18,7 +18,7 @@ export default function DocumentsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { token } = useAuth();
-  const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null);
+  const [pendingSessionKey, setPendingSessionKey] = useState<string | null>(null);
 
   const documentsQuery = useQuery({
     queryKey: ["documents"],
@@ -27,18 +27,22 @@ export default function DocumentsPage() {
   });
 
   const createSessionMutation = useMutation({
-    mutationFn: async (documentId: string) => {
+    mutationFn: async ({ documentId, mode }: { documentId: string; mode: "audio" | "capture" }) => {
       if (!token) {
         throw new Error("You need to be logged in to create a session.");
       }
 
-      setPendingDocumentId(documentId);
+      setPendingSessionKey(`${documentId}:${mode}`);
       return api.createSession(token, documentId);
     },
-    onSuccess: async (session) => {
+    onSuccess: async (session, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       toast.success("Study session created.");
-      router.push(`/study/${session.id}/read`);
+      router.push(
+        variables.mode === "capture"
+          ? `/study/${session.id}/capture`
+          : `/study/${session.id}/read`,
+      );
     },
     onError: (error) => {
       const message =
@@ -47,7 +51,7 @@ export default function DocumentsPage() {
           : "Could not create the study session.";
       toast.error(message);
     },
-    onSettled: () => setPendingDocumentId(null),
+    onSettled: () => setPendingSessionKey(null),
   });
 
   const documents = documentsQuery.data ?? [];
@@ -170,27 +174,47 @@ export default function DocumentsPage() {
                       </div>
                     </div>
 
-                    <div className="mt-8 flex items-center justify-between gap-3 border-t border-[var(--border-soft)] pt-6">
+                    <div className="mt-4 rounded-2xl border border-[var(--border-soft)] bg-white/72 p-4">
+                      <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+                        <span className="flex items-center gap-2 text-[var(--foreground-soft)]">
+                          <Bookmark className="size-4 text-[var(--primary)]" />
+                          {document.last_read_page > 0
+                            ? `Resume at page ${document.last_read_page}`
+                            : "Not started"}
+                        </span>
+                        <span className="tabular-nums text-[var(--muted-foreground)]">
+                          {document.progress_percent}%
+                        </span>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(75,102,72,0.10)]">
+                        <div
+                          className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),#86a77d)] transition-[width]"
+                          style={{ width: `${document.progress_percent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-8 border-t border-[var(--border-soft)] pt-6">
                       <p className="text-xs text-[var(--muted-foreground)]">
                         {document.original_filename}
                       </p>
-                      <Button
-                        onClick={() => createSessionMutation.mutate(document.id)}
-                        disabled={
-                          createSessionMutation.isPending &&
-                          pendingDocumentId === document.id
-                        }
-                      >
-                        {createSessionMutation.isPending &&
-                        pendingDocumentId === document.id ? (
-                          "Starting..."
-                        ) : (
-                          <>
-                            Start session
-                            <ArrowRight className="size-4" />
-                          </>
-                        )}
-                      </Button>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <Button
+                          variant="secondary"
+                          onClick={() => createSessionMutation.mutate({ documentId: document.id, mode: "audio" })}
+                          disabled={createSessionMutation.isPending}
+                        >
+                          <Mic2 className="size-4" />
+                          {pendingSessionKey === `${document.id}:audio` ? "Starting..." : "Audio recall"}
+                        </Button>
+                        <Button
+                          onClick={() => createSessionMutation.mutate({ documentId: document.id, mode: "capture" })}
+                          disabled={createSessionMutation.isPending}
+                        >
+                          <NotebookPen className="size-4" />
+                          {pendingSessionKey === `${document.id}:capture` ? "Starting..." : "Read & note"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

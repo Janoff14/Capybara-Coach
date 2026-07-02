@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ export default function StudyReadPage() {
   const queryClient = useQueryClient();
   const { token } = useAuth();
   const stopwatch = useStopwatch();
+  const [currentPage, setCurrentPage] = useState(1);
 
   const sessionQuery = useQuery({
     queryKey: ["sessions", params.sessionId],
@@ -47,11 +48,15 @@ export default function StudyReadPage() {
         throw new Error("You need to be logged in to update the session.");
       }
 
+      if (documentId) {
+        await api.saveDocumentProgress(token, documentId, currentPage);
+      }
       return api.finishReading(token, params.sessionId);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sessions", params.sessionId] });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
       toast.success("Reading marked as complete.");
       router.push(`/study/${params.sessionId}/record?autostart=1`);
     },
@@ -115,6 +120,8 @@ export default function StudyReadPage() {
         keyTerms={readerGuide.keyTerms}
         sections={readerGuide.sections}
         title={document?.title ?? "Source document"}
+        initialPage={document?.last_read_page || 1}
+        onCurrentPageChange={setCurrentPage}
       />
     </div>
   );

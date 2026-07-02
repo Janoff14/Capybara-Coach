@@ -1,6 +1,10 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class DocumentProgressUpdate(BaseModel):
+    page: int = Field(ge=1)
 
 
 class DocumentRead(BaseModel):
@@ -16,5 +20,7 @@ class DocumentRead(BaseModel):
     extracted_text: str
     reader_json: dict | None
     page_count: int
+    last_read_page: int = 0
+    progress_percent: int = 0
     created_at: datetime
     updated_at: datetime

@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
@@ -11,7 +13,12 @@ from app.models.review_schedule import ReviewSchedule
 from app.models.study_session import StudySession
 from app.models.user import User
 from app.schemas.flashcard import FlashcardRead
-from app.schemas.session import RecallHintRead, SessionCreate, StudySessionRead
+from app.schemas.session import (
+    RecallHintRead,
+    SessionCreate,
+    StudySessionRead,
+    TypedCaptureUpdate,
+)
 from app.services.ai import (
     ASSESSMENT_PROTOCOL_VERSION,
     assess_transcript,
@@ -26,6 +33,8 @@ from app.services.storage import build_object_path, download_bytes, sanitize_fil
 from app.models.shared import utcnow
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+TYPED_CAPTURE_PROVIDER = "typed-capture-v1"
 
 
 def _coerce_int(value: object, default: int = -1) -> int:
@@ -53,6 +62,69 @@ def _get_session_or_404(db: Session, session_id: str, user_id: str) -> StudySess
     if study_session is None:
         raise HTTPException(status_code=404, detail="Study session not found.")
     return study_session
+
+
+def _typed_capture_chunks(study_session: StudySession) -> list[dict[str, str]]:
+    if study_session.transcript_provider != TYPED_CAPTURE_PROVIDER:
+        return []
+
+    try:
+        payload = json.loads(study_session.transcript_text or "")
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+    chunks = payload.get("chunks") if isinstance(payload, dict) else None
+    if not isinstance(chunks, list):
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for item in chunks:
+        if not isinstance(item, dict):
+            continue
+        content = str(item.get("content") or "").strip()
+        category = str(item.get("category") or "")
+        if not content or category not in {"study_material", "note_only", "ai_direction"}:
+            continue
+        normalized.append(
+            {
+                "id": str(item.get("id") or ""),
+                "content": content,
+                "category": category,
+                "created_at": str(item.get("created_at") or ""),
+            }
+        )
+    return normalized
+
+
+def _typed_capture_inputs(study_session: StudySession) -> tuple[str, str, str, str]:
+    chunks = _typed_capture_chunks(study_session)
+    study_material = [item["content"] for item in chunks if item["category"] == "study_material"]
+    note_only = [item["content"] for item in chunks if item["category"] == "note_only"]
+    directions = [item["content"] for item in chunks if item["category"] == "ai_direction"]
+
+    flashcard_text = "\n\n".join(study_material)
+    assessment_text = flashcard_text or "\n\n".join(note_only)
+    note_text = "\n\n".join(
+        [
+            *(f"Study material: {item}" for item in study_material),
+            *(f"Personal note: {item}" for item in note_only),
+        ]
+    )
+    instructions = "\n".join(f"- {item}" for item in directions)
+    return assessment_text, note_text, instructions, flashcard_text
+
+
+def _clear_generated_outputs(db: Session, study_session: StudySession) -> None:
+    for card in list(study_session.flashcards):
+        db.delete(card)
+    if study_session.review_schedule is not None:
+        db.delete(study_session.review_schedule)
+    if study_session.note is not None:
+        db.delete(study_session.note)
+
+    study_session.assessment_score = None
+    study_session.assessment_feedback = None
+    study_session.assessment_json = None
 
 
 @router.get("", response_model=list[StudySessionRead])
@@ -109,6 +181,43 @@ def finish_reading(
 ) -> StudySession:
     study_session = _get_session_or_404(db, session_id, current_user.id)
     study_session.status = "reading_complete"
+    db.add(study_session)
+    db.commit()
+    return _get_session_or_404(db, session_id, current_user.id)
+
+
+@router.put("/{session_id}/typed-capture", response_model=StudySessionRead)
+def save_typed_capture(
+    session_id: str,
+    payload: TypedCaptureUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StudySession:
+    study_session = _get_session_or_404(db, session_id, current_user.id)
+    serialized_chunks = [
+        {
+            "id": chunk.id,
+            "content": chunk.content,
+            "category": chunk.category,
+            "created_at": chunk.created_at.isoformat(),
+        }
+        for chunk in payload.chunks
+    ]
+    next_transcript = json.dumps(
+        {"version": 1, "chunks": serialized_chunks},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+    if (
+        study_session.transcript_provider != TYPED_CAPTURE_PROVIDER
+        or study_session.transcript_text != next_transcript
+    ):
+        _clear_generated_outputs(db, study_session)
+
+    study_session.transcript_text = next_transcript
+    study_session.transcript_provider = TYPED_CAPTURE_PROVIDER
+    study_session.status = "capturing_notes"
     db.add(study_session)
     db.commit()
     return _get_session_or_404(db, session_id, current_user.id)
@@ -262,6 +371,15 @@ def run_assessment(
     if not study_session.transcript_text:
         raise HTTPException(status_code=400, detail="Transcribe audio before assessment.")
 
+    assessment_transcript = study_session.transcript_text
+    if study_session.transcript_provider == TYPED_CAPTURE_PROVIDER:
+        assessment_transcript, _, _, _ = _typed_capture_inputs(study_session)
+        if not assessment_transcript:
+            raise HTTPException(
+                status_code=400,
+                detail="Add study material or note-only content before ending the session.",
+            )
+
     existing_assessment = study_session.assessment_json or {}
     if (
         isinstance(existing_assessment, dict)
@@ -272,7 +390,7 @@ def run_assessment(
 
     try:
         assessment = assess_transcript(
-            transcript=study_session.transcript_text,
+            transcript=assessment_transcript,
             source_text=study_session.document.extracted_text,
             strictness=strictness,
             settings=settings,
@@ -301,13 +419,19 @@ def create_notes(
     if study_session.assessment_json is None or not study_session.transcript_text:
         raise HTTPException(status_code=400, detail="Assess the session before generating notes.")
 
+    note_transcript = study_session.transcript_text
+    processing_instructions = ""
+    if study_session.transcript_provider == TYPED_CAPTURE_PROVIDER:
+        _, note_transcript, processing_instructions, _ = _typed_capture_inputs(study_session)
+
     try:
         note_payload = generate_notes(
-            transcript=study_session.transcript_text,
+            transcript=note_transcript,
             source_text=study_session.document.extracted_text,
             assessment=study_session.assessment_json,
             document_title=study_session.document.title,
             settings=settings,
+            processing_instructions=processing_instructions,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -369,14 +493,28 @@ def create_flashcards(
         db.commit()
         return [_serialize_flashcard(card) for card in study_session.flashcards]
 
+    flashcard_transcript = study_session.transcript_text
+    processing_instructions = ""
+    note_payload = study_session.note.note_json if study_session.note else None
+    if study_session.transcript_provider == TYPED_CAPTURE_PROVIDER:
+        _, _, processing_instructions, flashcard_transcript = _typed_capture_inputs(study_session)
+        # Note-only chunks can appear in the polished note, but must never leak into cards.
+        note_payload = None
+        if not flashcard_transcript:
+            return []
+
     try:
         flashcards_payload = generate_flashcards(
-            transcript=study_session.transcript_text,
+            transcript=flashcard_transcript,
             source_text=study_session.document.extracted_text,
             assessment=study_session.assessment_json,
             document_title=study_session.document.title,
-            note_payload=study_session.note.note_json if study_session.note else None,
+            note_payload=note_payload,
             settings=settings,
+            processing_instructions=processing_instructions,
+            restrict_to_transcript=(
+                study_session.transcript_provider == TYPED_CAPTURE_PROVIDER
+            ),
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

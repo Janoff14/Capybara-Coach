@@ -57,6 +57,14 @@ function getRouteMeta(pathname: string) {
     };
   }
 
+  if (pathname.includes("/study/") && pathname.endsWith("/capture")) {
+    return {
+      title: "Read & note",
+      description: "Keep the textbook open while you build a categorized study trail beside it.",
+      active: "/documents",
+    };
+  }
+
   if (pathname.includes("/study/") && pathname.endsWith("/record")) {
     return {
       title: "Recall mode",
@@ -98,6 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { logout, user } = useAuth();
   const routeMeta = getRouteMeta(pathname);
+  const isCaptureMode = pathname.includes("/study/") && pathname.endsWith("/capture");
 
   const handleLogout = () => {
     logout();
@@ -201,8 +210,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="px-6 pb-28 pt-24 lg:pl-[19rem] lg:pr-8 lg:pt-24">
-        <div className="mx-auto max-w-7xl">{children}</div>
+      <main
+        className={cn(
+          "px-6 pb-28 pt-24 lg:pl-[19rem] lg:pr-8 lg:pt-24",
+          isCaptureMode && "lg:pr-5",
+        )}
+      >
+        <div className={cn("mx-auto", isCaptureMode ? "max-w-[1700px]" : "max-w-7xl")}>
+          {children}
+        </div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-[var(--border-soft)] bg-[rgba(250,249,244,0.94)] px-2 py-2 backdrop-blur-xl lg:hidden">

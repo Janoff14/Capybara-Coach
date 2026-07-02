@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 const STATUS_LABELS: Record<string, string> = {
   created: "Created",
   reading_complete: "Reading complete",
+  capturing_notes: "Capturing notes",
   audio_uploaded: "Audio uploaded",
   transcribed: "Transcribed",
   assessed: "Assessed",

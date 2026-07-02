@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import {
   BookOpenText,
+  Bookmark,
   Expand,
   Eye,
   EyeOff,
@@ -17,6 +18,7 @@ import {
 
 import type { ReaderSection } from "@/lib/document-reader";
 import type { ReaderHighlightType, ReaderKeyTerm } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -37,6 +39,8 @@ type DocumentReaderProps = {
   keyTerms: ReaderKeyTerm[];
   sections: ReaderSection[];
   title: string;
+  initialPage?: number;
+  onCurrentPageChange?: (page: number) => void;
 };
 
 export function DocumentReader({
@@ -47,6 +51,8 @@ export function DocumentReader({
   keyTerms,
   sections,
   title,
+  initialPage = 1,
+  onCurrentPageChange,
 }: DocumentReaderProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHighlights, setShowHighlights] = useState(true);
@@ -89,6 +95,8 @@ export function DocumentReader({
             sections={sections}
             showHighlights={showHighlights}
             title={title}
+            initialPage={initialPage}
+            onCurrentPageChange={onCurrentPageChange}
           />
         </div>
       </div>
@@ -108,6 +116,8 @@ export function DocumentReader({
       sections={sections}
       showHighlights={showHighlights}
       title={title}
+      initialPage={initialPage}
+      onCurrentPageChange={onCurrentPageChange}
     />
   );
 }
@@ -124,6 +134,8 @@ function ReaderSurface({
   sections,
   showHighlights,
   title,
+  initialPage = 1,
+  onCurrentPageChange,
 }: DocumentReaderProps & {
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
@@ -133,6 +145,7 @@ function ReaderSurface({
   const [numPages, setNumPages] = useState(0);
   const [pageWidth, setPageWidth] = useState(760);
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  const didResumeRef = useRef(false);
   const blobUrl = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
 
   useEffect(() => {
@@ -163,6 +176,53 @@ function ReaderSurface({
 
     return () => observer.disconnect();
   }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!numPages || didResumeRef.current) {
+      return;
+    }
+
+    const page = Math.max(1, Math.min(initialPage, numPages));
+    const timeoutId = window.setTimeout(() => {
+      const node = viewerRef.current;
+      const target = node?.querySelector<HTMLElement>(`[data-reader-page="${page}"]`);
+      if (node && target) {
+        const targetTop = target.getBoundingClientRect().top - node.getBoundingClientRect().top + node.scrollTop;
+        node.scrollTo({ top: Math.max(0, targetTop - 16) });
+      }
+      onCurrentPageChange?.(page);
+      didResumeRef.current = true;
+    }, 180);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [initialPage, numPages, onCurrentPageChange]);
+
+  useEffect(() => {
+    const node = viewerRef.current;
+    if (!node || !numPages || !onCurrentPageChange) {
+      return;
+    }
+
+    const ratios = new Map<number, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const page = Number((entry.target as HTMLElement).dataset.readerPage);
+          ratios.set(page, entry.isIntersecting ? entry.intersectionRatio : 0);
+        }
+        const visible = [...ratios.entries()].sort((a, b) => b[1] - a[1])[0];
+        if (visible && visible[1] > 0) {
+          onCurrentPageChange(visible[0]);
+        }
+      },
+      { root: node, threshold: [0, 0.2, 0.45, 0.7] },
+    );
+
+    node
+      .querySelectorAll<HTMLElement>("[data-reader-page]")
+      .forEach((page) => observer.observe(page));
+    return () => observer.disconnect();
+  }, [numPages, onCurrentPageChange]);
 
   return (
     <Card className={isFullscreen ? "flex h-full flex-col overflow-hidden" : "overflow-hidden"}>
@@ -254,11 +314,24 @@ function ReaderSurface({
                   {Array.from({ length: numPages || 0 }, (_, index) => (
                     <div
                       key={`page-${index + 1}`}
-                      className="rounded-[26px] border border-[var(--border-soft)] bg-white p-3 shadow-[0_18px_40px_rgba(28,27,27,0.08)]"
+                      data-reader-page={index + 1}
+                      className={cn(
+                        "scroll-mt-4 rounded-[26px] border bg-white p-3 shadow-[0_18px_40px_rgba(28,27,27,0.08)]",
+                        initialPage === index + 1
+                          ? "border-amber-400/70 ring-4 ring-amber-200/35"
+                          : "border-[var(--border-soft)]",
+                      )}
                     >
                       <div className="mb-3 flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                         <span>Page {index + 1}</span>
-                        <span>{title}</span>
+                        {initialPage === index + 1 ? (
+                          <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-amber-900">
+                            <Bookmark className="size-3.5 fill-current" />
+                            Resume marker
+                          </span>
+                        ) : (
+                          <span>{title}</span>
+                        )}
                       </div>
                       <div className="overflow-hidden rounded-[18px] border border-[rgba(28,27,27,0.06)] bg-white">
                         <Page

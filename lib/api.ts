@@ -10,6 +10,7 @@ import type {
   StudySessionRead,
   TokenResponse,
   UploadDocumentInput,
+  TypedCaptureChunk,
 } from "@/lib/types";
 
 const LOCAL_API_BASE_URL = "http://localhost:8000";
@@ -231,6 +232,14 @@ export const api = {
     return requestBlob(`/documents/${documentId}/file`, { token });
   },
 
+  saveDocumentProgress(token: string, documentId: string, page: number) {
+    return request<DocumentRead>(`/documents/${documentId}/progress`, {
+      method: "PUT",
+      token,
+      json: { page },
+    });
+  },
+
   uploadDocument(token: string, input: UploadDocumentInput) {
     const formData = new FormData();
     formData.append("file", input.file);
@@ -268,6 +277,14 @@ export const api = {
     return request<StudySessionRead>(`/sessions/${sessionId}/finish-reading`, {
       method: "POST",
       token,
+    });
+  },
+
+  saveTypedCapture(token: string, sessionId: string, chunks: TypedCaptureChunk[]) {
+    return request<StudySessionRead>(`/sessions/${sessionId}/typed-capture`, {
+      method: "PUT",
+      token,
+      json: { chunks },
     });
   },
 

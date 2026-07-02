@@ -3,13 +3,14 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.models.document import Document
+from app.models.document_progress import DocumentProgress
 from app.models.user import User
-from app.schemas.document import DocumentRead
+from app.schemas.document import DocumentProgressUpdate, DocumentRead
 from app.services.ai import generate_reader_guide
 from app.services.auth import get_current_user
 from app.services.pdf import extract_text_from_payload
@@ -19,9 +20,13 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 def _get_document_or_404(db: Session, document_id: str, user_id: str) -> Document:
-    statement = select(Document).where(
-        Document.id == document_id,
-        Document.user_id == user_id,
+    statement = (
+        select(Document)
+        .options(selectinload(Document.reading_progress))
+        .where(
+            Document.id == document_id,
+            Document.user_id == user_id,
+        )
     )
     document = db.scalars(statement).one_or_none()
     if document is None:
@@ -36,6 +41,7 @@ def list_documents(
 ) -> list[Document]:
     statement = (
         select(Document)
+        .options(selectinload(Document.reading_progress))
         .where(Document.user_id == current_user.id)
         .order_by(Document.created_at.desc())
     )
@@ -76,6 +82,33 @@ def get_document_file(
             "Content-Disposition": f'inline; filename="{filename}"',
         },
     )
+
+
+@router.put("/{document_id}/progress", response_model=DocumentRead)
+def update_document_progress(
+    document_id: str,
+    payload: DocumentProgressUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Document:
+    document = _get_document_or_404(db, document_id, current_user.id)
+    upper_bound = max(1, document.page_count)
+    page = min(payload.page, upper_bound)
+
+    progress = document.reading_progress
+    if progress is None:
+        progress = DocumentProgress(
+            user_id=current_user.id,
+            document_id=document.id,
+            last_read_page=page,
+        )
+        document.reading_progress = progress
+    else:
+        progress.last_read_page = page
+
+    db.add(progress)
+    db.commit()
+    return _get_document_or_404(db, document_id, current_user.id)
 
 
 @router.post("/upload", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)

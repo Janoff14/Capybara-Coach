@@ -23,6 +23,8 @@ export type DocumentRead = {
   extracted_text: string;
   reader_json: ReaderGuideJson | null;
   page_count: number;
+  last_read_page: number;
+  progress_percent: number;
   created_at: string;
   updated_at: string;
 };
@@ -141,6 +143,15 @@ export type RecallHintRead = {
   transcript_so_far: string;
   source: "ai" | "fallback";
   debug_reason?: string | null;
+};
+
+export type TypedChunkCategory = "study_material" | "note_only" | "ai_direction";
+
+export type TypedCaptureChunk = {
+  id: string;
+  content: string;
+  category: TypedChunkCategory;
+  created_at: string;
 };
 
 export type StudySessionRead = {

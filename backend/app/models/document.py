@@ -37,3 +37,18 @@ class Document(Base):
         back_populates="document",
         cascade="all, delete-orphan",
     )
+    reading_progress: Mapped["DocumentProgress | None"] = relationship(
+        back_populates="document",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def last_read_page(self) -> int:
+        return self.reading_progress.last_read_page if self.reading_progress else 0
+
+    @property
+    def progress_percent(self) -> int:
+        if self.page_count <= 0 or self.last_read_page <= 0:
+            return 0
+        return min(100, round((self.last_read_page / self.page_count) * 100))

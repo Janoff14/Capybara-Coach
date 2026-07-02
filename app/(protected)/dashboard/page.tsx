@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
+  Bookmark,
   CalendarClock,
   Clock3,
   FileText,
@@ -222,6 +223,20 @@ export default function DashboardPage() {
                       addSuffix: true,
                     })}
                   </p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[rgba(75,102,72,0.10)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--primary)]"
+                        style={{ width: `${document.progress_percent}%` }}
+                      />
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[var(--muted-foreground)]">
+                      <Bookmark className="size-3" />
+                      {document.last_read_page > 0
+                        ? `Page ${document.last_read_page} · ${document.progress_percent}%`
+                        : "Not started"}
+                    </span>
+                  </div>
                 </div>
               ))
             )}

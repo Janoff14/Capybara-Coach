@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 import unittest
@@ -226,7 +227,7 @@ class PipelineApiTests(unittest.TestCase):
                     "summary": "A short clean summary of inertia.",
                     "content": "Objects resist changes to their motion unless a net force acts.",
                 },
-            ),
+            ) as generate_notes_mock,
             patch(
                 "app.api.routes.sessions.generate_flashcards",
                 return_value=[
@@ -245,7 +246,7 @@ class PipelineApiTests(unittest.TestCase):
                         "source_focus": "net force",
                     },
                 ],
-            ),
+            ) as generate_flashcards_mock,
         ):
             me_response = self.client.get("/auth/me", headers=headers)
             self.assertEqual(me_response.status_code, 200)
@@ -260,6 +261,16 @@ class PipelineApiTests(unittest.TestCase):
             document = document_response.json()
             self.assertIn("Newton's first law", document["extracted_text"])
             self.assertEqual(document["reader_json"]["sections"][0]["heading"], "Core principle")
+            self.assertEqual(document["progress_percent"], 0)
+
+            progress_response = self.client.put(
+                f"/documents/{document['id']}/progress",
+                headers=headers,
+                json={"page": 99},
+            )
+            self.assertEqual(progress_response.status_code, 200)
+            self.assertEqual(progress_response.json()["last_read_page"], 1)
+            self.assertEqual(progress_response.json()["progress_percent"], 100)
 
             document_file_response = self.client.get(
                 f"/documents/{document['id']}/file",
@@ -416,6 +427,139 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(grade_review_response.json()["last_rating"], "easy")
             self.assertEqual(grade_review_response.json()["current_interval_days"], 7)
             self.assertFalse(grade_review_response.json()["is_due"])
+
+            typed_session_response = self.client.post(
+                "/sessions",
+                headers=headers,
+                json={"document_id": document["id"]},
+            )
+            self.assertEqual(typed_session_response.status_code, 201)
+            typed_session = typed_session_response.json()
+            typed_chunks = [
+                {
+                    "id": "material-1",
+                    "content": "Inertia preserves an object's state of motion.",
+                    "category": "study_material",
+                    "created_at": "2026-07-02T08:00:00Z",
+                },
+                {
+                    "id": "note-1",
+                    "content": "Connect this to the bus example from class.",
+                    "category": "note_only",
+                    "created_at": "2026-07-02T08:01:00Z",
+                },
+                {
+                    "id": "direction-1",
+                    "content": "Keep the final note especially concise.",
+                    "category": "ai_direction",
+                    "created_at": "2026-07-02T08:02:00Z",
+                },
+            ]
+            capture_response = self.client.put(
+                f"/sessions/{typed_session['id']}/typed-capture",
+                headers=headers,
+                json={"chunks": typed_chunks},
+            )
+            self.assertEqual(capture_response.status_code, 200)
+            capture_payload = capture_response.json()
+            self.assertEqual(capture_payload["status"], "capturing_notes")
+            self.assertEqual(capture_payload["transcript_provider"], "typed-capture-v1")
+            self.assertEqual(
+                json.loads(capture_payload["transcript_text"])["chunks"][1]["category"],
+                "note_only",
+            )
+
+            invalid_capture_response = self.client.put(
+                f"/sessions/{typed_session['id']}/typed-capture",
+                headers=headers,
+                json={
+                    "chunks": [
+                        {
+                            **typed_chunks[0],
+                            "content": "   ",
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(invalid_capture_response.status_code, 422)
+
+            typed_assess_response = self.client.post(
+                f"/sessions/{typed_session['id']}/assess",
+                headers=headers,
+            )
+            self.assertEqual(typed_assess_response.status_code, 200)
+            self.assertEqual(
+                assess_transcript_mock.call_args.kwargs["transcript"],
+                "Inertia preserves an object's state of motion.",
+            )
+
+            typed_notes_response = self.client.post(
+                f"/sessions/{typed_session['id']}/notes",
+                headers=headers,
+            )
+            self.assertEqual(typed_notes_response.status_code, 200)
+            self.assertIn(
+                "Personal note: Connect this to the bus example from class.",
+                generate_notes_mock.call_args.kwargs["transcript"],
+            )
+            self.assertIn(
+                "Keep the final note especially concise.",
+                generate_notes_mock.call_args.kwargs["processing_instructions"],
+            )
+
+            typed_flashcards_response = self.client.post(
+                f"/sessions/{typed_session['id']}/flashcards",
+                headers=headers,
+            )
+            self.assertEqual(typed_flashcards_response.status_code, 200)
+            self.assertEqual(
+                generate_flashcards_mock.call_args.kwargs["transcript"],
+                "Inertia preserves an object's state of motion.",
+            )
+            self.assertIsNone(generate_flashcards_mock.call_args.kwargs["note_payload"])
+            self.assertTrue(generate_flashcards_mock.call_args.kwargs["restrict_to_transcript"])
+
+            note_only_session = self.client.post(
+                "/sessions",
+                headers=headers,
+                json={"document_id": document["id"]},
+            ).json()
+            note_only_chunk = {
+                "id": "private-note-1",
+                "content": "Remember the professor's demonstration.",
+                "category": "note_only",
+                "created_at": "2026-07-02T08:03:00Z",
+            }
+            self.assertEqual(
+                self.client.put(
+                    f"/sessions/{note_only_session['id']}/typed-capture",
+                    headers=headers,
+                    json={"chunks": [note_only_chunk]},
+                ).status_code,
+                200,
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/sessions/{note_only_session['id']}/assess",
+                    headers=headers,
+                ).status_code,
+                200,
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/sessions/{note_only_session['id']}/notes",
+                    headers=headers,
+                ).status_code,
+                200,
+            )
+            flashcard_call_count = generate_flashcards_mock.call_count
+            note_only_cards_response = self.client.post(
+                f"/sessions/{note_only_session['id']}/flashcards",
+                headers=headers,
+            )
+            self.assertEqual(note_only_cards_response.status_code, 200)
+            self.assertEqual(note_only_cards_response.json(), [])
+            self.assertEqual(generate_flashcards_mock.call_count, flashcard_call_count)
 
     def test_cors_allows_vercel_origins(self) -> None:
         response = self.client.options(

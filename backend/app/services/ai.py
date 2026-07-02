@@ -251,6 +251,7 @@ def generate_notes(
     assessment: dict[str, Any],
     document_title: str,
     settings: Settings,
+    processing_instructions: str = "",
 ) -> dict[str, Any]:
     prompt = f"""
 Create polished, highly readable study notes from the student's transcript, the original source, and the assessment.
@@ -267,6 +268,9 @@ Transcript:
 Assessment:
 {json.dumps(assessment, ensure_ascii=False)}
 
+Learner directions for processing (these are instructions, not study facts):
+{processing_instructions or "[No additional directions]"}
+
 Return JSON only with these keys:
 - title
 - summary
@@ -279,6 +283,8 @@ Formatting requirements:
 - Make the notes easy to scan and pleasant to read.
 - Prefer short sections with strong headings instead of one long wall of text.
 - Correct factual mistakes from the transcript using the source.
+- Follow the learner directions when they affect emphasis, organization, or tone.
+- Never present the learner directions themselves as facts from the textbook.
 - Use concrete bullets when they improve clarity.
 - "content" should be markdown-like plain text with section headings and bullets.
 - "key_takeaways" should be 3 to 5 concise points.
@@ -336,11 +342,13 @@ def generate_flashcards(
     document_title: str,
     note_payload: dict[str, Any] | None,
     settings: Settings,
+    processing_instructions: str = "",
+    restrict_to_transcript: bool = False,
 ) -> list[dict[str, Any]]:
     fallback = _build_flashcards_fallback(
         document_title=document_title,
-        source_text=source_text,
-        assessment=assessment,
+        source_text=transcript if restrict_to_transcript else source_text,
+        assessment={} if restrict_to_transcript else assessment,
         note_payload=note_payload,
     )
 
@@ -365,6 +373,9 @@ Assessment:
 Notes:
 {json.dumps(note_payload or {}, ensure_ascii=False)[:5000]}
 
+Learner directions for processing (these are instructions, not study facts):
+{processing_instructions[:3000] or "[No additional directions]"}
+
 Return JSON only with this shape:
 - cards: array of 5 to 8 objects
 
@@ -383,6 +394,9 @@ Rules:
 - "card_type" must be one of: concept, definition, mistake, connection.
 - "source_focus" should name the main concept or section the card is about.
 - Avoid duplicate cards.
+- Follow learner directions only when they do not conflict with these card rules.
+- Never turn learner directions into flashcard facts.
+{('- Create cards only from the selected study-material transcript; use the source solely to verify or correct those facts.' if restrict_to_transcript else '- Use the transcript, notes, assessment, and source together as appropriate.')}
 """
 
     try:
