@@ -73,3 +73,12 @@ def _run_lightweight_migrations() -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE app_documents ADD COLUMN reader_json JSON"
                 )
+
+        if "app_study_sessions" in table_names:
+            session_columns = {
+                column["name"] for column in inspector.get_columns("app_study_sessions")
+            }
+            if "source_note_id" not in session_columns:
+                connection.exec_driver_sql(
+                    "ALTER TABLE app_study_sessions ADD COLUMN source_note_id VARCHAR(36)"
+                )

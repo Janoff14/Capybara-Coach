@@ -1,20 +1,24 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2, Mic2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { NoteRichContent } from "@/components/app/note-rich-content";
 import { PageHeader } from "@/components/app/page-header";
 import { useAuth } from "@/components/providers/auth-provider";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { api, ApiError } from "@/lib/api";
 import { formatNote } from "@/lib/note-format";
-import { api } from "@/lib/api";
 
 export default function NoteDetailPage() {
   const params = useParams<{ noteId: string }>();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { token } = useAuth();
 
   const noteQuery = useQuery({
@@ -27,6 +31,26 @@ export default function NoteDetailPage() {
   const formattedNote = note ? formatNote(note) : null;
   const isTypedCaptureNote = note?.note_json?.source_mode === "typed_capture";
 
+  const startRecallMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) {
+        throw new Error("You need to be logged in to start note recall.");
+      }
+      return api.createNoteRecallSession(token, params.noteId);
+    },
+    onSuccess: async (session) => {
+      await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      router.push(`/study/${session.id}/record?autostart=1`);
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof ApiError || error instanceof Error
+          ? error.message
+          : "Could not start note recall.",
+      );
+    },
+  });
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -36,6 +60,17 @@ export default function NoteDetailPage() {
           isTypedCaptureNote
             ? "Review the note organized from your own reading capture."
             : "Review the cleaned summary and final note body generated from your assessed explanation."
+        }
+        actions={
+          note ? (
+            <Button
+              onClick={() => startRecallMutation.mutate()}
+              disabled={startRecallMutation.isPending}
+            >
+              <Mic2 className="size-4" />
+              {startRecallMutation.isPending ? "Opening recorder..." : "Retell this note"}
+            </Button>
+          ) : null
         }
       />
 

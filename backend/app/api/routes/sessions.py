@@ -15,6 +15,7 @@ from app.models.user import User
 from app.schemas.flashcard import FlashcardRead
 from app.schemas.session import (
     RecallHintRead,
+    NoteRecallSessionCreate,
     SessionCreate,
     StudySessionRead,
     TypedCaptureUpdate,
@@ -63,6 +64,30 @@ def _get_session_or_404(db: Session, session_id: str, user_id: str) -> StudySess
     if study_session is None:
         raise HTTPException(status_code=404, detail="Study session not found.")
     return study_session
+
+
+def _get_source_note_or_404(db: Session, study_session: StudySession) -> Note:
+    if not study_session.source_note_id:
+        raise HTTPException(status_code=404, detail="Source note not found.")
+
+    statement = select(Note).where(
+        Note.id == study_session.source_note_id,
+        Note.user_id == study_session.user_id,
+    )
+    note = db.scalars(statement).one_or_none()
+    if note is None:
+        raise HTTPException(status_code=404, detail="Source note not found.")
+    return note
+
+
+def _recall_source(db: Session, study_session: StudySession) -> tuple[str, str]:
+    if study_session.source_note_id:
+        note = _get_source_note_or_404(db, study_session)
+        source_text = "\n\n".join(
+            value for value in [note.summary.strip(), note.content.strip()] if value
+        )
+        return source_text, note.title
+    return study_session.document.extracted_text, study_session.document.title
 
 
 def _typed_capture_chunks(study_session: StudySession) -> list[dict[str, str]]:
@@ -160,6 +185,32 @@ def create_session(
         user_id=current_user.id,
         document_id=document.id,
         status="created",
+    )
+    db.add(study_session)
+    db.commit()
+    return _get_session_or_404(db, study_session.id, current_user.id)
+
+
+@router.post("/from-note", response_model=StudySessionRead, status_code=status.HTTP_201_CREATED)
+def create_note_recall_session(
+    payload: NoteRecallSessionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StudySession:
+    statement = (
+        select(Note)
+        .options(joinedload(Note.study_session))
+        .where(Note.id == payload.note_id, Note.user_id == current_user.id)
+    )
+    note = db.scalars(statement).one_or_none()
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found.")
+
+    study_session = StudySession(
+        user_id=current_user.id,
+        document_id=note.study_session.document_id,
+        source_note_id=note.id,
+        status="reading_complete",
     )
     db.add(study_session)
     db.commit()
@@ -391,12 +442,13 @@ def recall_hint(
     if not transcript_so_far:
         raise HTTPException(status_code=400, detail="No speech was detected in the audio.")
 
+    source_text, source_title = _recall_source(db, study_session)
     hint = generate_recall_hint(
         transcript_so_far=transcript_so_far,
         latest_chunk=transcript_text,
-        source_text=study_session.document.extracted_text,
-        document_title=study_session.document.title,
-        reader_guide=study_session.document.reader_json,
+        source_text=source_text,
+        document_title=source_title,
+        reader_guide=(None if study_session.source_note_id else study_session.document.reader_json),
         strictness=strictness,
         settings=settings,
     )
@@ -469,10 +521,11 @@ def run_assessment(
     ):
         return _get_session_or_404(db, session_id, current_user.id)
 
+    source_text, _ = _recall_source(db, study_session)
     try:
         assessment = assess_transcript(
             transcript=assessment_transcript,
-            source_text=study_session.document.extracted_text,
+            source_text=source_text,
             strictness=strictness,
             settings=settings,
         )
@@ -501,6 +554,11 @@ def create_notes(
         raise HTTPException(
             status_code=400,
             detail="Use typed-results for Read & note sessions.",
+        )
+    if study_session.source_note_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Note recall sessions only produce assessment feedback.",
         )
     if study_session.assessment_json is None or not study_session.transcript_text:
         raise HTTPException(status_code=400, detail="Assess the session before generating notes.")
@@ -552,6 +610,11 @@ def create_flashcards(
         raise HTTPException(
             status_code=400,
             detail="Use typed-results for Read & note sessions.",
+        )
+    if study_session.source_note_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Note recall sessions only produce assessment feedback.",
         )
     if study_session.assessment_json is None or not study_session.transcript_text:
         raise HTTPException(

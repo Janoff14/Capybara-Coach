@@ -157,6 +157,7 @@ export type TypedCaptureChunk = {
 export type StudySessionRead = {
   id: string;
   document_id: string;
+  source_note_id: string | null;
   status: string;
   audio_filename: string | null;
   audio_content_type: string | null;

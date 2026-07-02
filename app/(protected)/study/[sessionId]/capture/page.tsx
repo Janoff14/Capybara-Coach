@@ -73,9 +73,14 @@ export default function StudyCapturePage() {
   const stopwatch = useStopwatch();
   const [chunks, setChunks] = useState<TypedCaptureChunk[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isSaving, setIsSaving] = useState(false);
+  const [manualMarkerPage, setManualMarkerPage] = useState<number | null>(null);
+  const [pendingSaveCount, setPendingSaveCount] = useState(0);
+  const [isMarking, setIsMarking] = useState(false);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
   const hydratedRef = useRef(false);
+  const didInitializePageRef = useRef(false);
+  const chunksRef = useRef<TypedCaptureChunk[]>([]);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const sessionQuery = useQuery({
     queryKey: ["sessions", params.sessionId],
@@ -100,25 +105,38 @@ export default function StudyCapturePage() {
     if (!sessionQuery.data || hydratedRef.current) {
       return;
     }
-    setChunks(parseTypedChunks(sessionQuery.data));
+    const savedChunks = parseTypedChunks(sessionQuery.data);
+    chunksRef.current = savedChunks;
+    setChunks(savedChunks);
     hydratedRef.current = true;
   }, [sessionQuery.data]);
 
   useEffect(() => {
-    if (documentQuery.data?.last_read_page) {
-      setCurrentPage(documentQuery.data.last_read_page);
+    if (!documentQuery.data || didInitializePageRef.current) {
+      return;
     }
-  }, [documentQuery.data?.last_read_page]);
+    setCurrentPage(documentQuery.data.last_read_page || 1);
+    didInitializePageRef.current = true;
+  }, [documentQuery.data]);
 
-  const persistChunks = async (nextChunks: TypedCaptureChunk[]) => {
+  const queueChunkSave = (nextChunks: TypedCaptureChunk[]) => {
     if (!token) {
-      throw new Error("You need to be logged in to save reading notes.");
+      toast.error("You need to be logged in to save reading notes.");
+      return false;
     }
 
-    const session = await api.saveTypedCapture(token, params.sessionId, nextChunks);
-    const savedChunks = parseTypedChunks(session);
-    setChunks(savedChunks.length === nextChunks.length ? savedChunks : nextChunks);
-    await queryClient.invalidateQueries({ queryKey: ["sessions"] });
+    setPendingSaveCount((count) => count + 1);
+    const saveOperation = saveQueueRef.current.then(async () => {
+      await api.saveTypedCapture(token, params.sessionId, nextChunks);
+    });
+    saveQueueRef.current = saveOperation
+      .catch((error) => {
+        toast.error(errorMessage(error, "Could not sync your latest changes. They are still here locally."));
+      })
+      .finally(() => {
+        setPendingSaveCount((count) => Math.max(0, count - 1));
+      });
+    return true;
   };
 
   const handleSubmit = async (content: string, category: TypedChunkCategory) => {
@@ -129,36 +147,42 @@ export default function StudyCapturePage() {
       created_at: new Date().toISOString(),
     };
 
-    setIsSaving(true);
-    try {
-      await persistChunks([...chunks, nextChunk]);
-      return true;
-    } catch (error) {
-      toast.error(errorMessage(error, "Could not save this chunk."));
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
+    const nextChunks = [...chunksRef.current, nextChunk];
+    chunksRef.current = nextChunks;
+    setChunks(nextChunks);
+    return queueChunkSave(nextChunks);
   };
 
   const handleCategoryChange = async (chunkId: string, category: TypedChunkCategory) => {
-    const previousChunks = chunks;
-    const nextChunks = chunks.map((chunk) =>
+    const previousChunks = chunksRef.current;
+    const nextChunks = previousChunks.map((chunk) =>
       chunk.id === chunkId ? { ...chunk, category } : chunk,
     );
     if (nextChunks.every((chunk, index) => chunk.category === previousChunks[index]?.category)) {
       return;
     }
 
+    chunksRef.current = nextChunks;
     setChunks(nextChunks);
-    setIsSaving(true);
+    queueChunkSave(nextChunks);
+  };
+
+  const handleMarkPage = async () => {
+    if (!token || !documentId) {
+      toast.error("The textbook is not ready to save a marker yet.");
+      return;
+    }
+
+    setIsMarking(true);
     try {
-      await persistChunks(nextChunks);
+      await api.saveDocumentProgress(token, documentId, currentPage);
+      setManualMarkerPage(currentPage);
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast.success(`Page ${currentPage} marked as your resume point.`);
     } catch (error) {
-      setChunks(previousChunks);
-      toast.error(errorMessage(error, "Could not change this chunk category."));
+      toast.error(errorMessage(error, "Could not save this page marker."));
     } finally {
-      setIsSaving(false);
+      setIsMarking(false);
     }
   };
 
@@ -168,8 +192,12 @@ export default function StudyCapturePage() {
         throw new Error("The session or textbook is not ready yet.");
       }
 
+      await saveQueueRef.current;
+      setProcessingStage("Syncing your capture...");
+      await api.saveTypedCapture(token, params.sessionId, chunksRef.current);
+
       setProcessingStage("Saving page marker...");
-      await api.saveDocumentProgress(token, documentId, currentPage);
+      await api.saveDocumentProgress(token, documentId, manualMarkerPage ?? currentPage);
 
       setProcessingStage("Organizing your note and flashcards...");
       return api.processTypedCapture(token, params.sessionId);
@@ -207,10 +235,13 @@ export default function StudyCapturePage() {
       initialPage={document?.last_read_page || 1}
       isFinishing={finishMutation.isPending}
       isLoading={sessionQuery.isLoading || documentQuery.isLoading || documentFileQuery.isLoading}
-      isSaving={isSaving}
+      isMarking={isMarking}
+      isSaving={pendingSaveCount > 0}
+      markedPage={manualMarkerPage ?? document?.last_read_page ?? 0}
       onCategoryChange={handleCategoryChange}
       onCurrentPageChange={setCurrentPage}
       onFinish={() => finishMutation.mutate()}
+      onMarkPage={() => void handleMarkPage()}
       onSubmit={handleSubmit}
       processingStage={processingStage}
       title={document?.title ?? "Read & note"}

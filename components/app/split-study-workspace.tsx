@@ -85,10 +85,13 @@ type SplitStudyWorkspaceProps = {
   initialPage: number;
   isFinishing: boolean;
   isLoading: boolean;
+  isMarking: boolean;
   isSaving: boolean;
+  markedPage: number;
   onCategoryChange: (chunkId: string, category: TypedChunkCategory) => Promise<void>;
   onCurrentPageChange: (page: number) => void;
   onFinish: () => void;
+  onMarkPage: () => void;
   onSubmit: (content: string, category: TypedChunkCategory) => Promise<boolean>;
   processingStage: string | null;
   title: string;
@@ -103,10 +106,13 @@ export function SplitStudyWorkspace({
   initialPage,
   isFinishing,
   isLoading,
+  isMarking,
   isSaving,
+  markedPage,
   onCategoryChange,
   onCurrentPageChange,
   onFinish,
+  onMarkPage,
   onSubmit,
   processingStage,
   title,
@@ -241,14 +247,15 @@ export function SplitStudyWorkspace({
 
   const submitDraft = async () => {
     const content = draft.trim();
-    if (!content || isSaving || isFinishing) {
+    if (!content || isFinishing) {
       return;
     }
 
+    setDraft("");
+    textareaRef.current?.focus();
     const saved = await onSubmit(content, category);
-    if (saved) {
-      setDraft("");
-      textareaRef.current?.focus();
+    if (!saved) {
+      setDraft((current) => current || content);
     }
   };
 
@@ -278,6 +285,26 @@ export function SplitStudyWorkspace({
               <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-2 text-xs font-semibold text-[var(--foreground-soft)]">
                 Page {currentPage || 1}{numPages ? ` of ${numPages}` : ""}
               </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={onMarkPage}
+                disabled={!blobUrl || Boolean(error) || isMarking}
+                aria-label={`Mark page ${currentPage || 1} as the resume point`}
+              >
+                <Bookmark
+                  className={cn(
+                    "size-4",
+                    markedPage === currentPage && "fill-current",
+                  )}
+                />
+                {isMarking
+                  ? "Marking..."
+                  : markedPage === currentPage
+                    ? "Page marked"
+                    : "Mark this page"}
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -327,7 +354,7 @@ export function SplitStudyWorkspace({
                 <div className="mx-auto flex max-w-[940px] flex-col gap-6">
                   {Array.from({ length: numPages }, (_, index) => {
                     const page = index + 1;
-                    const isResumePage = initialPage > 0 && page === initialPage;
+                    const isResumePage = markedPage > 0 && page === markedPage;
                     return (
                       <article
                         key={page}
@@ -342,7 +369,7 @@ export function SplitStudyWorkspace({
                           {isResumePage ? (
                             <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-amber-900">
                               <Bookmark className="size-3.5 fill-current" />
-                              Resume marker
+                              Saved marker
                             </span>
                           ) : null}
                         </div>
@@ -431,7 +458,7 @@ export function SplitStudyWorkspace({
                             key={categoryOption.value}
                             type="button"
                             onClick={() => void onCategoryChange(chunk.id, categoryOption.value)}
-                            disabled={isSaving || isFinishing}
+                            disabled={isFinishing}
                             aria-label={`Mark as ${categoryOption.label}`}
                             aria-pressed={selected}
                             title={categoryOption.label}
@@ -452,7 +479,7 @@ export function SplitStudyWorkspace({
           </div>
 
           <footer className="border-t border-[var(--border-soft)] bg-white/92 p-4 backdrop-blur-xl">
-            <CategorySelector value={category} onChange={setCategory} disabled={isSaving || isFinishing} />
+            <CategorySelector value={category} onChange={setCategory} disabled={isFinishing} />
             <div className="mt-3 flex items-end gap-2">
               <Textarea
                 ref={textareaRef}
@@ -470,7 +497,7 @@ export function SplitStudyWorkspace({
                 type="button"
                 size="icon"
                 onClick={() => void submitDraft()}
-                disabled={!draft.trim() || isSaving || isFinishing}
+                disabled={!draft.trim() || isFinishing}
                 aria-label="Save chunk"
               >
                 <Send className="size-4" />
@@ -478,7 +505,10 @@ export function SplitStudyWorkspace({
             </div>
             <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-[var(--muted-foreground)]">
               <span>{CATEGORY_OPTIONS.find((item) => item.value === category)?.description}</span>
-              <span className="shrink-0 tabular-nums">{draft.length}/4000</span>
+              <span className="flex shrink-0 items-center gap-2 tabular-nums">
+                <span aria-live="polite">{isSaving ? "Syncing..." : "Saved"}</span>
+                <span>{draft.length}/4000</span>
+              </span>
             </div>
           </footer>
         </section>

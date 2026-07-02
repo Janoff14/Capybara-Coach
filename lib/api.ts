@@ -280,6 +280,14 @@ export const api = {
     });
   },
 
+  createNoteRecallSession(token: string, noteId: string) {
+    return request<StudySessionRead>("/sessions/from-note", {
+      method: "POST",
+      token,
+      json: { note_id: noteId },
+    });
+  },
+
   saveTypedCapture(token: string, sessionId: string, chunks: TypedCaptureChunk[]) {
     return request<StudySessionRead>(`/sessions/${sessionId}/typed-capture`, {
       method: "PUT",

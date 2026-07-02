@@ -73,6 +73,12 @@ export default function StudyRecordPage() {
     queryFn: () => api.getDocument(sessionQuery.data!.document_id, token!),
   });
 
+  const sourceNoteQuery = useQuery({
+    queryKey: ["notes", sessionQuery.data?.source_note_id],
+    enabled: Boolean(token && sessionQuery.data?.source_note_id),
+    queryFn: () => api.getNote(sessionQuery.data!.source_note_id!, token!),
+  });
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!token) {
@@ -111,13 +117,19 @@ export default function StudyRecordPage() {
 
   const session = sessionQuery.data;
   const document = documentQuery.data;
+  const sourceNote = sourceNoteQuery.data;
+  const isNoteRecall = Boolean(session?.source_note_id);
+  const recallSourceTitle = sourceNote?.title ?? document?.title ?? "this material";
+  const recallSourceText = sourceNote
+    ? [sourceNote.summary, sourceNote.content].filter(Boolean).join("\n\n")
+    : document?.extracted_text ?? "";
   const readerGuide = useMemo(
-    () => buildReaderGuide(document?.extracted_text ?? "", document?.reader_json ?? null),
-    [document?.extracted_text, document?.reader_json],
+    () => buildReaderGuide(recallSourceText, isNoteRecall ? null : document?.reader_json ?? null),
+    [document?.reader_json, isNoteRecall, recallSourceText],
   );
   const recallPrompts = useMemo(
-    () => buildRecallPrompts(document?.title ?? "this document", readerGuide),
-    [document?.title, readerGuide],
+    () => buildRecallPrompts(recallSourceTitle, readerGuide),
+    [readerGuide, recallSourceTitle],
   );
   const recallChecklist = useMemo(
     () => buildRecallChecklist(readerGuide),
@@ -167,7 +179,7 @@ export default function StudyRecordPage() {
     },
     onError: () => {
       const fallbackHint = buildFallbackRecallHint(
-        document?.title ?? "this document",
+        recallSourceTitle,
         readerGuide,
         recallTranscript,
         hintCountRef.current,
@@ -274,7 +286,7 @@ export default function StudyRecordPage() {
       return {
         state: "idle" as const,
         promptType: null,
-        message: "When you are ready, explain the document from memory. I will stay quiet unless you stall.",
+        message: `When you are ready, explain ${isNoteRecall ? "the note" : "the document"} from memory. I will stay quiet unless you stall.`,
       };
     }
 
@@ -326,6 +338,7 @@ export default function StudyRecordPage() {
     recorder.hasSpoken,
     recorder.isRecording,
     recorder.silenceDurationMs,
+    isNoteRecall,
   ]);
 
   const recorderStateLabel = useMemo(() => {
@@ -362,8 +375,12 @@ export default function StudyRecordPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Recall mode"
-        title={document?.title ?? "Recall from memory"}
-        description="The source is intentionally out of view now. Speak the material back from memory, then let the app upload, transcribe, and assess the explanation for you."
+        title={sourceNote?.title ?? document?.title ?? "Recall from memory"}
+        description={
+          isNoteRecall
+            ? "The note is intentionally out of view. Retell it from memory and the app will assess only your recall—no duplicate note or flashcards will be generated."
+            : "The source is intentionally out of view now. Speak the material back from memory, then let the app upload, transcribe, and assess the explanation for you."
+        }
         actions={
           <>
             {session ? <SessionStatusBadge status={session.status} /> : null}
@@ -596,8 +613,8 @@ export default function StudyRecordPage() {
 
           <RecallSessionPanel
             checklist={recallChecklist}
-            documentTitle={document?.title ?? "Current document"}
-            pageCount={document?.page_count ?? null}
+            documentTitle={sourceNote?.title ?? document?.title ?? "Current source"}
+            pageCount={isNoteRecall ? null : document?.page_count ?? null}
             prompts={recallPrompts}
           />
         </div>

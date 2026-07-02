@@ -189,6 +189,12 @@ export default function AssessmentPage() {
     queryFn: () => api.getDocument(sessionQuery.data!.document_id, token!),
   });
 
+  const sourceNoteQuery = useQuery({
+    queryKey: ["notes", sessionQuery.data?.source_note_id],
+    enabled: Boolean(token && sessionQuery.data?.source_note_id),
+    queryFn: () => api.getNote(sessionQuery.data!.source_note_id!, token!),
+  });
+
   const rerunAssessmentMutation = useMutation({
     mutationFn: async () => {
       if (!token) {
@@ -243,7 +249,7 @@ export default function AssessmentPage() {
 
   const flashcardsQuery = useQuery({
     queryKey: ["flashcards", params.sessionId],
-    enabled: Boolean(token && params.sessionId),
+    enabled: Boolean(token && params.sessionId && !sessionQuery.data?.source_note_id),
     queryFn: () => api.getFlashcards(token!, params.sessionId),
   });
 
@@ -273,6 +279,8 @@ export default function AssessmentPage() {
   const session = sessionQuery.data;
   const assessment = session?.assessment_json;
   const document = documentQuery.data;
+  const sourceNote = sourceNoteQuery.data;
+  const isNoteRecall = Boolean(session?.source_note_id);
 
   const criteria = useMemo(
     () => (assessment ? deriveCriteria(assessment) : null),
@@ -299,8 +307,12 @@ export default function AssessmentPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Assessment"
-        title={document?.title ?? "Assessment results"}
-        description="This review checks what you covered, what you missed, and how clearly your explanation held together."
+        title={sourceNote?.title ?? document?.title ?? "Assessment results"}
+        description={
+          isNoteRecall
+            ? "This review compares your retelling with the selected note. It gives feedback only and leaves the original note and its flashcards unchanged."
+            : "This review checks what you covered, what you missed, and how clearly your explanation held together."
+        }
         actions={session ? <SessionStatusBadge status={session.status} /> : null}
       />
 
@@ -429,60 +441,99 @@ export default function AssessmentPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2 text-[var(--foreground)]">
-                  <Sparkles className="size-4 text-[var(--primary)]" />
-                  <CardTitle>Next step</CardTitle>
-                </div>
-                <CardDescription>
-                  Turn this feedback into polished notes you can revisit later.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                    Notes flow
-                  </p>
-                  <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
-                    The note generator uses this transcript, the source text, and the current assessment lens.
-                  </p>
-                </div>
-                <Button
-                  className="w-full"
-                  onClick={() => generateNotesMutation.mutate()}
-                  disabled={generateNotesMutation.isPending}
-                >
-                  {generateNotesMutation.isPending ? "Generating notes..." : "Generate notes"}
-                </Button>
-                <Button
-                  className="w-full"
-                  variant="secondary"
-                  onClick={() =>
-                    hasFlashcards
-                      ? router.push(`/practice?sessionId=${params.sessionId}`)
-                      : generateFlashcardsMutation.mutate()
-                  }
-                  disabled={generateFlashcardsMutation.isPending}
-                >
-                  <PanelsTopLeft className="size-4" />
-                  {generateFlashcardsMutation.isPending
-                    ? "Building flashcards..."
-                    : hasFlashcards
-                      ? "Open practice deck"
-                      : "Generate flashcards"}
-                </Button>
-                {canOpenNotes ? (
+            {isNoteRecall ? (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-[var(--foreground)]">
+                    <CheckCircle2 className="size-4 text-[var(--primary)]" />
+                    <CardTitle>Recall complete</CardTitle>
+                  </div>
+                  <CardDescription>
+                    This session ends with feedback. Your source note and existing cards stay exactly as they were.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                      Assessment only
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+                      No new note or flashcard deck was created from this retelling.
+                    </p>
+                  </div>
+                  {sourceNote ? (
+                    <Button
+                      className="w-full"
+                      onClick={() => router.push(`/notes/${sourceNote.id}`)}
+                    >
+                      Back to source note
+                    </Button>
+                  ) : null}
                   <Button
                     className="w-full"
                     variant="secondary"
-                    onClick={() => router.push(`/notes/${session.note!.id}`)}
+                    onClick={() => router.push(`/study/${params.sessionId}/record`)}
                   >
-                    Open latest note
+                    Try another retelling
                   </Button>
-                ) : null}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2 text-[var(--foreground)]">
+                    <Sparkles className="size-4 text-[var(--primary)]" />
+                    <CardTitle>Next step</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Turn this feedback into polished notes you can revisit later.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                      Notes flow
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
+                      The note generator uses this transcript, the source text, and the current assessment lens.
+                    </p>
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={() => generateNotesMutation.mutate()}
+                    disabled={generateNotesMutation.isPending}
+                  >
+                    {generateNotesMutation.isPending ? "Generating notes..." : "Generate notes"}
+                  </Button>
+                  <Button
+                    className="w-full"
+                    variant="secondary"
+                    onClick={() =>
+                      hasFlashcards
+                        ? router.push(`/practice?sessionId=${params.sessionId}`)
+                        : generateFlashcardsMutation.mutate()
+                    }
+                    disabled={generateFlashcardsMutation.isPending}
+                  >
+                    <PanelsTopLeft className="size-4" />
+                    {generateFlashcardsMutation.isPending
+                      ? "Building flashcards..."
+                      : hasFlashcards
+                        ? "Open practice deck"
+                        : "Generate flashcards"}
+                  </Button>
+                  {canOpenNotes ? (
+                    <Button
+                      className="w-full"
+                      variant="secondary"
+                      onClick={() => router.push(`/notes/${session.note!.id}`)}
+                    >
+                      Open latest note
+                    </Button>
+                  ) : null}
+                </CardContent>
+              </Card>
+            )}
           </section>
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">

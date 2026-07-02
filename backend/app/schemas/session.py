@@ -10,6 +10,10 @@ class SessionCreate(BaseModel):
     document_id: str
 
 
+class NoteRecallSessionCreate(BaseModel):
+    note_id: str
+
+
 TypedChunkCategory = Literal["study_material", "note_only", "ai_direction"]
 
 
@@ -37,6 +41,7 @@ class StudySessionRead(BaseModel):
 
     id: str
     document_id: str
+    source_note_id: str | None
     status: str
     audio_filename: str | None
     audio_content_type: str | None

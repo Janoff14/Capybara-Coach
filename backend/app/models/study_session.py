@@ -16,6 +16,15 @@ class StudySession(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     user_id: Mapped[str] = mapped_column(ForeignKey("app_users.id"), index=True)
     document_id: Mapped[str] = mapped_column(ForeignKey("app_documents.id"), index=True)
+    source_note_id: Mapped[str | None] = mapped_column(
+        ForeignKey(
+            "app_notes.id",
+            name="fk_study_sessions_source_note_id",
+            use_alter=True,
+        ),
+        nullable=True,
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(32), default="created")
 
     audio_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -41,6 +50,7 @@ class StudySession(Base):
     document: Mapped["Document"] = relationship(back_populates="study_sessions")
     note: Mapped["Note | None"] = relationship(
         back_populates="study_session",
+        foreign_keys="Note.study_session_id",
         uselist=False,
         cascade="all, delete-orphan",
     )

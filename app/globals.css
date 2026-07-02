@@ -75,6 +75,26 @@ textarea {
   color: var(--foreground);
 }
 
+/* React PDF positions an invisible text layer over the rendered page canvas.
+   Keep that text invisible while selected so it does not print a second,
+   slightly offset copy of every glyph over the PDF. */
+.textLayer ::selection {
+  background: rgba(75, 102, 72, 0.24);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+.textLayer ::-moz-selection {
+  background: rgba(75, 102, 72, 0.24);
+  color: transparent;
+  text-shadow: none;
+}
+
+.textLayer br::selection {
+  background: transparent;
+}
+
 @layer components {
   .glass-panel {
     background: rgba(250, 249, 244, 0.72);

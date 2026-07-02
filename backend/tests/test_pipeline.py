@@ -424,6 +424,73 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(repeated_flashcards_response.status_code, 200)
             self.assertEqual(len(repeated_flashcards_response.json()), 2)
 
+            note_recall_response = self.client.post(
+                "/sessions/from-note",
+                headers=headers,
+                json={"note_id": final_session["note"]["id"]},
+            )
+            self.assertEqual(note_recall_response.status_code, 201)
+            note_recall_session = note_recall_response.json()
+            self.assertEqual(
+                note_recall_session["source_note_id"],
+                final_session["note"]["id"],
+            )
+            self.assertEqual(note_recall_session["status"], "reading_complete")
+
+            note_hint_response = self.client.post(
+                f"/sessions/{note_recall_session['id']}/recall-hint",
+                headers=headers,
+                files={"file": ("note-hint.wav", b"fake-audio", "audio/wav")},
+                data={"strictness": "50", "cumulative_transcript": "Objects keep moving."},
+            )
+            self.assertEqual(note_hint_response.status_code, 200)
+            self.assertIn(
+                "Objects resist changes to their motion",
+                generate_recall_hint_mock.call_args.kwargs["source_text"],
+            )
+            self.assertEqual(
+                generate_recall_hint_mock.call_args.kwargs["document_title"],
+                "Newton's First Law",
+            )
+            self.assertIsNone(generate_recall_hint_mock.call_args.kwargs["reader_guide"])
+
+            note_audio_response = self.client.post(
+                f"/sessions/{note_recall_session['id']}/audio",
+                headers=headers,
+                files={"file": ("note-recall.wav", b"fake-audio", "audio/wav")},
+            )
+            self.assertEqual(note_audio_response.status_code, 200)
+            self.assertEqual(
+                self.client.post(
+                    f"/sessions/{note_recall_session['id']}/transcribe",
+                    headers=headers,
+                ).status_code,
+                200,
+            )
+            note_assess_response = self.client.post(
+                f"/sessions/{note_recall_session['id']}/assess?strictness=50",
+                headers=headers,
+            )
+            self.assertEqual(note_assess_response.status_code, 200)
+            self.assertIn(
+                "Objects resist changes to their motion",
+                assess_transcript_mock.call_args.kwargs["source_text"],
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/sessions/{note_recall_session['id']}/notes",
+                    headers=headers,
+                ).status_code,
+                400,
+            )
+            self.assertEqual(
+                self.client.post(
+                    f"/sessions/{note_recall_session['id']}/flashcards",
+                    headers=headers,
+                ).status_code,
+                400,
+            )
+
             reviews_response = self.client.get("/reviews", headers=headers)
             self.assertEqual(reviews_response.status_code, 200)
             self.assertEqual(len(reviews_response.json()), 1)

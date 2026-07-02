@@ -31,6 +31,9 @@ class Note(Base):
         onupdate=utcnow,
     )
 
-    study_session: Mapped["StudySession"] = relationship(back_populates="note")
+    study_session: Mapped["StudySession"] = relationship(
+        back_populates="note",
+        foreign_keys=[study_session_id],
+    )
     user: Mapped["User"] = relationship(back_populates="notes")
     flashcards: Mapped[list["Flashcard"]] = relationship(back_populates="note")
