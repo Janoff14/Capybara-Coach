@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Clock3,
   FileText,
+  MessageSquareText,
   NotebookPen,
   PanelsTopLeft,
   Sparkles,
@@ -134,6 +135,12 @@ export default function DashboardPage() {
 
           <div className="flex flex-wrap gap-3">
             <UploadDocumentDialog />
+            <Button asChild>
+              <Link href="/capture">
+                <MessageSquareText className="size-4" />
+                Read & note
+              </Link>
+            </Button>
             <Button variant="secondary" asChild>
               <Link href="/documents">Documents</Link>
             </Button>

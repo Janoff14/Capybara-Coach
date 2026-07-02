@@ -7,6 +7,7 @@ import {
   BookOpenText,
   LayoutDashboard,
   LogOut,
+  MessageSquareText,
   NotebookPen,
   PanelsTopLeft,
   Search,
@@ -20,11 +21,20 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/documents", label: "Documents", icon: BookOpenText },
+  { href: "/capture", label: "Read & note", icon: MessageSquareText },
   { href: "/practice", label: "Practice", icon: PanelsTopLeft },
   { href: "/notes", label: "Notes", icon: NotebookPen },
 ];
 
 function getRouteMeta(pathname: string) {
+  if (pathname.startsWith("/capture")) {
+    return {
+      title: "Read & note",
+      description: "Choose a textbook and take categorized notes beside the page.",
+      active: "/capture",
+    };
+  }
+
   if (pathname.startsWith("/documents")) {
     return {
       title: "Documents",
@@ -61,7 +71,7 @@ function getRouteMeta(pathname: string) {
     return {
       title: "Read & note",
       description: "Keep the textbook open while you build a categorized study trail beside it.",
-      active: "/documents",
+      active: "/capture",
     };
   }
 
