@@ -25,6 +25,21 @@ def _create_client(settings: Settings) -> Client:
     return create_client(settings.supabase_url, settings.supabase_key)
 
 
+def _filesystem_object_path(
+    *,
+    settings: Settings,
+    bucket: str,
+    object_path: str,
+) -> Path:
+    root = settings.storage_dir.resolve()
+    target = (root / sanitize_filename(bucket) / object_path).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise RuntimeError("Storage path escapes the configured storage directory.") from exc
+    return target
+
+
 def upload_bytes(
     *,
     settings: Settings,
@@ -33,6 +48,16 @@ def upload_bytes(
     payload: bytes,
     content_type: str | None,
 ) -> str:
+    if settings.uses_filesystem_storage:
+        target = _filesystem_object_path(
+            settings=settings,
+            bucket=bucket,
+            object_path=object_path,
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        return object_path
+
     client = _create_client(settings)
     options = {"upsert": "false"}
     if content_type:
@@ -42,6 +67,17 @@ def upload_bytes(
 
 
 def download_bytes(*, settings: Settings, bucket: str, object_path: str) -> bytes:
+    if settings.uses_filesystem_storage:
+        target = _filesystem_object_path(
+            settings=settings,
+            bucket=bucket,
+            object_path=object_path,
+        )
+        try:
+            return target.read_bytes()
+        except FileNotFoundError as exc:
+            raise RuntimeError("Stored file was not found.") from exc
+
     client = _create_client(settings)
     payload = client.storage.from_(bucket).download(object_path)
     if isinstance(payload, bytes):
@@ -50,5 +86,14 @@ def download_bytes(*, settings: Settings, bucket: str, object_path: str) -> byte
 
 
 def remove_object(*, settings: Settings, bucket: str, object_path: str) -> None:
+    if settings.uses_filesystem_storage:
+        target = _filesystem_object_path(
+            settings=settings,
+            bucket=bucket,
+            object_path=object_path,
+        )
+        target.unlink(missing_ok=True)
+        return
+
     client = _create_client(settings)
     client.storage.from_(bucket).remove([object_path])

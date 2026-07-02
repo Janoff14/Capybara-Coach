@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     database_url: str = "sqlite:///./capybara_coach.db"
     storage_dir: Path = Path("./storage")
+    storage_backend: str = "supabase"
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     cors_allowed_origin_regex: str = r"https://.*\.vercel\.app"
     jwt_secret_key: str = "change-me-in-production"
@@ -49,13 +50,20 @@ class Settings(BaseSettings):
             problems.append("DATABASE_URL must use persistent PostgreSQL")
         if self.jwt_secret_key == "change-me-in-production" or len(self.jwt_secret_key) < 32:
             problems.append("JWT_SECRET_KEY must be a unique secret of at least 32 characters")
-        if not self.supabase_url or not self.supabase_key:
+        storage_backend = self.storage_backend.strip().lower()
+        if storage_backend not in {"supabase", "filesystem"}:
+            problems.append("STORAGE_BACKEND must be 'supabase' or 'filesystem'")
+        if storage_backend == "supabase" and (not self.supabase_url or not self.supabase_key):
             problems.append("Supabase storage credentials are required")
 
         if problems:
             raise ValueError("Invalid production configuration: " + "; ".join(problems))
 
         return self
+
+    @property
+    def uses_filesystem_storage(self) -> bool:
+        return self.storage_backend.strip().lower() == "filesystem"
 
     @property
     def cors_origins(self) -> list[str]:
