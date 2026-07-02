@@ -251,7 +251,6 @@ def generate_notes(
     assessment: dict[str, Any],
     document_title: str,
     settings: Settings,
-    processing_instructions: str = "",
 ) -> dict[str, Any]:
     prompt = f"""
 Create polished, highly readable study notes from the student's transcript, the original source, and the assessment.
@@ -268,9 +267,6 @@ Transcript:
 Assessment:
 {json.dumps(assessment, ensure_ascii=False)}
 
-Learner directions for processing (these are instructions, not study facts):
-{processing_instructions or "[No additional directions]"}
-
 Return JSON only with these keys:
 - title
 - summary
@@ -283,8 +279,6 @@ Formatting requirements:
 - Make the notes easy to scan and pleasant to read.
 - Prefer short sections with strong headings instead of one long wall of text.
 - Correct factual mistakes from the transcript using the source.
-- Follow the learner directions when they affect emphasis, organization, or tone.
-- Never present the learner directions themselves as facts from the textbook.
 - Use concrete bullets when they improve clarity.
 - "content" should be markdown-like plain text with section headings and bullets.
 - "key_takeaways" should be 3 to 5 concise points.
@@ -334,6 +328,141 @@ Formatting requirements:
     }
 
 
+def generate_capture_study_set(
+    *,
+    study_material: list[str],
+    note_only: list[str],
+    processing_instructions: list[str],
+    document_title: str,
+    settings: Settings,
+) -> dict[str, Any]:
+    material_text = "\n\n".join(study_material).strip()
+    note_only_text = "\n\n".join(note_only).strip()
+    fallback_sections: list[dict[str, Any]] = []
+
+    if study_material:
+        fallback_sections.append(
+            {
+                "heading": "Study material",
+                "body": "",
+                "bullets": study_material,
+            }
+        )
+    if note_only:
+        fallback_sections.append(
+            {
+                "heading": "Personal notes",
+                "body": "",
+                "bullets": note_only,
+            }
+        )
+
+    captured_content = "\n\n".join([value for value in [material_text, note_only_text] if value])
+    fallback_summary = next(
+        (item for item in [*study_material, *note_only] if item.strip()),
+        "Notes captured during the reading session.",
+    )
+    fallback_note = {
+        "title": f"{document_title} notes",
+        "summary": fallback_summary[:320],
+        "content": _compose_note_content(
+            summary=fallback_summary[:320],
+            sections=fallback_sections,
+            key_takeaways=study_material[:5],
+            review_questions=[],
+            fallback=captured_content,
+        ),
+        "key_takeaways": study_material[:5],
+        "review_questions": [],
+        "sections": fallback_sections,
+        "source_mode": "typed_capture",
+    }
+    fallback_cards = _normalize_flashcards(
+        [
+            {
+                "question": "What idea did you capture here?",
+                "answer": item,
+                "cue": "Recall your reading note",
+                "card_type": "concept",
+                "source_focus": document_title,
+            }
+            for item in study_material[:8]
+        ]
+    )
+
+    if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+        return {"note": fallback_note, "cards": fallback_cards}
+
+    prompt = f"""
+Organize the learner's own typed reading capture into one polished note and a compact flashcard deck.
+
+Textbook title (metadata only):
+{document_title}
+
+Study-material chunks (may be used in both the note and flashcards):
+{json.dumps(study_material, ensure_ascii=False)[:12000]}
+
+Note-only chunks (may appear in the note, but never in flashcards):
+{json.dumps(note_only, ensure_ascii=False)[:8000]}
+
+Learner directions (instructions only; never present these as facts):
+{json.dumps(processing_instructions, ensure_ascii=False)[:4000]}
+
+Return JSON only with this shape:
+- note: object with title, summary, content, key_takeaways, review_questions, sections
+- cards: array of 0 to 8 objects with question, answer, cue, card_type, source_focus
+
+Rules:
+- Use only the learner-provided chunks. Do not add, verify, assess, correct, or infer facts from the textbook.
+- Do not score the learner or discuss accuracy, coverage, omissions, or performance.
+- Preserve the learner's intended meaning while improving organization and readability.
+- Note-only chunks must never become flashcard questions, answers, cues, or source focus.
+- Learner directions control emphasis, organization, or tone but are not note content unless explicitly requested.
+- Flashcards must test active recall of study-material chunks, avoid duplicates, and include a short cue.
+- card_type must be one of: concept, definition, mistake, connection.
+"""
+
+    try:
+        content = _chat_json(
+            settings=settings,
+            system_prompt=(
+                "You organize a learner's own typed notes into useful study artifacts. "
+                "You never evaluate them or consult outside source material."
+            ),
+            user_prompt=prompt,
+            temperature=0,
+        )
+        payload = _parse_json_payload(content)
+        raw_note = payload.get("note") if isinstance(payload.get("note"), dict) else {}
+        sections = _note_sections(raw_note.get("sections"))
+        key_takeaways = _string_list(raw_note.get("key_takeaways"))
+        review_questions = _string_list(raw_note.get("review_questions"))
+        summary = str(raw_note.get("summary") or fallback_note["summary"]).strip()
+        note_content = str(raw_note.get("content") or "").strip()
+        if not note_content:
+            note_content = _compose_note_content(
+                summary=summary,
+                sections=sections or fallback_sections,
+                key_takeaways=key_takeaways,
+                review_questions=review_questions,
+                fallback=captured_content,
+            )
+
+        note = {
+            "title": str(raw_note.get("title") or fallback_note["title"]).strip(),
+            "summary": summary,
+            "content": note_content,
+            "key_takeaways": key_takeaways,
+            "review_questions": review_questions,
+            "sections": sections or fallback_sections,
+            "source_mode": "typed_capture",
+        }
+        cards = _normalize_flashcards(payload.get("cards")) if study_material else []
+        return {"note": note, "cards": cards or fallback_cards}
+    except Exception:
+        return {"note": fallback_note, "cards": fallback_cards}
+
+
 def generate_flashcards(
     *,
     transcript: str,
@@ -342,13 +471,11 @@ def generate_flashcards(
     document_title: str,
     note_payload: dict[str, Any] | None,
     settings: Settings,
-    processing_instructions: str = "",
-    restrict_to_transcript: bool = False,
 ) -> list[dict[str, Any]]:
     fallback = _build_flashcards_fallback(
         document_title=document_title,
-        source_text=transcript if restrict_to_transcript else source_text,
-        assessment={} if restrict_to_transcript else assessment,
+        source_text=source_text,
+        assessment=assessment,
         note_payload=note_payload,
     )
 
@@ -373,9 +500,6 @@ Assessment:
 Notes:
 {json.dumps(note_payload or {}, ensure_ascii=False)[:5000]}
 
-Learner directions for processing (these are instructions, not study facts):
-{processing_instructions[:3000] or "[No additional directions]"}
-
 Return JSON only with this shape:
 - cards: array of 5 to 8 objects
 
@@ -394,9 +518,6 @@ Rules:
 - "card_type" must be one of: concept, definition, mistake, connection.
 - "source_focus" should name the main concept or section the card is about.
 - Avoid duplicate cards.
-- Follow learner directions only when they do not conflict with these card rules.
-- Never turn learner directions into flashcard facts.
-{('- Create cards only from the selected study-material transcript; use the source solely to verify or correct those facts.' if restrict_to_transcript else '- Use the transcript, notes, assessment, and source together as appropriate.')}
 """
 
     try:

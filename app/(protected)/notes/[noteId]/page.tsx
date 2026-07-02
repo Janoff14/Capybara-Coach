@@ -25,13 +25,18 @@ export default function NoteDetailPage() {
 
   const note = noteQuery.data;
   const formattedNote = note ? formatNote(note) : null;
+  const isTypedCaptureNote = note?.note_json?.source_mode === "typed_capture";
 
   return (
     <div className="space-y-8">
       <PageHeader
         eyebrow="Note detail"
         title={note?.title ?? "Loading note"}
-        description="Review the cleaned summary and final note body generated from your assessed explanation."
+        description={
+          isTypedCaptureNote
+            ? "Review the note organized from your own reading capture."
+            : "Review the cleaned summary and final note body generated from your assessed explanation."
+        }
       />
 
       {noteQuery.isLoading ? (

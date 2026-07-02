@@ -247,6 +247,29 @@ class PipelineApiTests(unittest.TestCase):
                     },
                 ],
             ) as generate_flashcards_mock,
+            patch(
+                "app.api.routes.sessions.generate_capture_study_set",
+                return_value={
+                    "note": {
+                        "title": "My Newton Notes",
+                        "summary": "My captured explanation of inertia.",
+                        "content": "Inertia preserves an object's state of motion.",
+                        "key_takeaways": ["Inertia preserves motion."],
+                        "review_questions": ["What does inertia preserve?"],
+                        "sections": [],
+                        "source_mode": "typed_capture",
+                    },
+                    "cards": [
+                        {
+                            "question": "What does inertia preserve?",
+                            "answer": "An object's state of motion.",
+                            "cue": "Think motion",
+                            "card_type": "concept",
+                            "source_focus": "Inertia",
+                        }
+                    ],
+                },
+            ) as generate_capture_mock,
         ):
             me_response = self.client.get("/auth/me", headers=headers)
             self.assertEqual(me_response.status_code, 200)
@@ -487,37 +510,40 @@ class PipelineApiTests(unittest.TestCase):
                 f"/sessions/{typed_session['id']}/assess",
                 headers=headers,
             )
-            self.assertEqual(typed_assess_response.status_code, 200)
-            self.assertEqual(
-                assess_transcript_mock.call_args.kwargs["transcript"],
-                "Inertia preserves an object's state of motion.",
-            )
+            self.assertEqual(typed_assess_response.status_code, 400)
+            assessment_call_count = assess_transcript_mock.call_count
 
-            typed_notes_response = self.client.post(
-                f"/sessions/{typed_session['id']}/notes",
+            typed_results_response = self.client.post(
+                f"/sessions/{typed_session['id']}/typed-results",
                 headers=headers,
             )
-            self.assertEqual(typed_notes_response.status_code, 200)
-            self.assertIn(
-                "Personal note: Connect this to the bus example from class.",
-                generate_notes_mock.call_args.kwargs["transcript"],
+            self.assertEqual(typed_results_response.status_code, 200)
+            typed_result = typed_results_response.json()
+            self.assertEqual(typed_result["status"], "notes_ready")
+            self.assertIsNone(typed_result["assessment_json"])
+            self.assertEqual(typed_result["note"]["note_json"]["source_mode"], "typed_capture")
+            self.assertEqual(assess_transcript_mock.call_count, assessment_call_count)
+            self.assertEqual(
+                generate_capture_mock.call_args.kwargs["study_material"],
+                ["Inertia preserves an object's state of motion."],
             )
-            self.assertIn(
-                "Keep the final note especially concise.",
-                generate_notes_mock.call_args.kwargs["processing_instructions"],
+            self.assertEqual(
+                generate_capture_mock.call_args.kwargs["note_only"],
+                ["Connect this to the bus example from class."],
             )
-
-            typed_flashcards_response = self.client.post(
-                f"/sessions/{typed_session['id']}/flashcards",
+            self.assertEqual(
+                generate_capture_mock.call_args.kwargs["processing_instructions"],
+                ["Keep the final note especially concise."],
+            )
+            self.assertNotIn(
+                "source_text",
+                generate_capture_mock.call_args.kwargs,
+            )
+            typed_cards_response = self.client.get(
+                f"/flashcards?session_id={typed_session['id']}",
                 headers=headers,
             )
-            self.assertEqual(typed_flashcards_response.status_code, 200)
-            self.assertEqual(
-                generate_flashcards_mock.call_args.kwargs["transcript"],
-                "Inertia preserves an object's state of motion.",
-            )
-            self.assertIsNone(generate_flashcards_mock.call_args.kwargs["note_payload"])
-            self.assertTrue(generate_flashcards_mock.call_args.kwargs["restrict_to_transcript"])
+            self.assertEqual(len(typed_cards_response.json()), 1)
 
             note_only_session = self.client.post(
                 "/sessions",
@@ -538,28 +564,16 @@ class PipelineApiTests(unittest.TestCase):
                 ).status_code,
                 200,
             )
-            self.assertEqual(
-                self.client.post(
-                    f"/sessions/{note_only_session['id']}/assess",
-                    headers=headers,
-                ).status_code,
-                200,
-            )
-            self.assertEqual(
-                self.client.post(
-                    f"/sessions/{note_only_session['id']}/notes",
-                    headers=headers,
-                ).status_code,
-                200,
-            )
-            flashcard_call_count = generate_flashcards_mock.call_count
-            note_only_cards_response = self.client.post(
-                f"/sessions/{note_only_session['id']}/flashcards",
+            note_only_results_response = self.client.post(
+                f"/sessions/{note_only_session['id']}/typed-results",
                 headers=headers,
             )
-            self.assertEqual(note_only_cards_response.status_code, 200)
+            self.assertEqual(note_only_results_response.status_code, 200)
+            note_only_cards_response = self.client.get(
+                f"/flashcards?session_id={note_only_session['id']}",
+                headers=headers,
+            )
             self.assertEqual(note_only_cards_response.json(), [])
-            self.assertEqual(generate_flashcards_mock.call_count, flashcard_call_count)
 
     def test_cors_allows_vercel_origins(self) -> None:
         response = self.client.options(

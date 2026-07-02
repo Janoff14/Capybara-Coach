@@ -288,6 +288,14 @@ export const api = {
     });
   },
 
+  processTypedCapture(token: string, sessionId: string) {
+    return request<StudySessionRead>(`/sessions/${sessionId}/typed-results`, {
+      method: "POST",
+      token,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
+    });
+  },
+
   uploadSessionAudio(token: string, sessionId: string, file: File) {
     const formData = new FormData();
     formData.append("file", file);

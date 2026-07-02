@@ -171,16 +171,10 @@ export default function StudyCapturePage() {
       setProcessingStage("Saving page marker...");
       await api.saveDocumentProgress(token, documentId, currentPage);
 
-      setProcessingStage("Assessing captured material...");
-      await api.assessSession(token, params.sessionId);
-
-      setProcessingStage("Building your note...");
-      await api.generateNotes(token, params.sessionId);
-
-      setProcessingStage("Creating flashcards...");
-      await api.generateFlashcards(token, params.sessionId);
+      setProcessingStage("Organizing your note and flashcards...");
+      return api.processTypedCapture(token, params.sessionId);
     },
-    onSuccess: async () => {
+    onSuccess: async (session) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["sessions"] }),
@@ -188,7 +182,7 @@ export default function StudyCapturePage() {
         queryClient.invalidateQueries({ queryKey: ["flashcards"] }),
       ]);
       toast.success("Your note, flashcards, and resume point are ready.");
-      router.push(`/study/${params.sessionId}/assessment`);
+      router.push(session.note ? `/notes/${session.note.id}` : "/notes");
     },
     onError: (error) => {
       toast.error(errorMessage(error, "Session processing stopped. Your chunks are still saved."));
