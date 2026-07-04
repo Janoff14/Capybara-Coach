@@ -372,7 +372,7 @@ export default function StudyRecordPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="catalog-study-page catalog-recall-page space-y-8">
       <PageHeader
         eyebrow="Recall mode"
         title={sourceNote?.title ?? document?.title ?? "Recall from memory"}

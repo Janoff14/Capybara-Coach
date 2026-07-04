@@ -10,24 +10,22 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import { Document as PdfDocument, Page, pdfjs } from "react-pdf";
 import {
   Bookmark,
   BookOpenText,
   Brain,
-  Clock3,
   MessageSquareText,
   NotebookPen,
   Pause,
   Play,
   Send,
   Sparkles,
+  X,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import type { TypedCaptureChunk, TypedChunkCategory } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -41,38 +39,34 @@ const PDF_OPTIONS = {
 const CATEGORY_OPTIONS: Array<{
   value: TypedChunkCategory;
   label: string;
-  shortLabel: string;
+  sub: string;
   description: string;
   icon: typeof Brain;
-  activeClass: string;
-  bubbleClass: string;
+  tone: "study" | "note" | "ai";
 }> = [
   {
     value: "study_material",
     label: "Study material",
-    shortLabel: "Cards + note",
-    description: "Use this in the polished note and flashcard deck.",
+    sub: "→ flashcard",
+    description: "Facts to become flashcards",
     icon: Brain,
-    activeClass: "border-emerald-300 bg-emerald-100 text-emerald-900",
-    bubbleClass: "border-emerald-200 bg-emerald-50/90",
+    tone: "study",
   },
   {
     value: "note_only",
     label: "Note only",
-    shortLabel: "Note only",
-    description: "Keep this in your note, but never turn it into a card.",
+    sub: "→ note",
+    description: "Kept as a note, not a card",
     icon: NotebookPen,
-    activeClass: "border-sky-300 bg-sky-100 text-sky-900",
-    bubbleClass: "border-sky-200 bg-sky-50/90",
+    tone: "note",
   },
   {
     value: "ai_direction",
     label: "AI direction",
-    shortLabel: "Instruction",
-    description: "Tell the AI how to organize or emphasize the final result.",
+    sub: "instruction",
+    description: "A private instruction for the AI",
     icon: Sparkles,
-    activeClass: "border-amber-300 bg-amber-100 text-amber-950",
-    bubbleClass: "border-amber-200 bg-amber-50/90",
+    tone: "ai",
   },
 ];
 
@@ -92,6 +86,7 @@ type SplitStudyWorkspaceProps = {
   onCurrentPageChange: (page: number) => void;
   onFinish: () => void;
   onMarkPage: () => void;
+  onRemove: (chunkId: string) => Promise<void>;
   onSubmit: (content: string, category: TypedChunkCategory) => Promise<boolean>;
   processingStage: string | null;
   title: string;
@@ -113,6 +108,7 @@ export function SplitStudyWorkspace({
   onCurrentPageChange,
   onFinish,
   onMarkPage,
+  onRemove,
   onSubmit,
   processingStage,
   title,
@@ -130,29 +126,28 @@ export function SplitStudyWorkspace({
   const scrollFrameRef = useRef<number | null>(null);
   const lastFrameAtRef = useRef<number | null>(null);
   const blobUrl = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
-
-  const hasProcessableChunks = chunks.some(
-    (chunk) => chunk.category === "study_material" || chunk.category === "note_only",
+  const counts = useMemo(
+    () => ({
+      study: chunks.filter((chunk) => chunk.category === "study_material").length,
+      note: chunks.filter((chunk) => chunk.category === "note_only").length,
+      ai: chunks.filter((chunk) => chunk.category === "ai_direction").length,
+    }),
+    [chunks],
   );
+  const hasProcessableChunks = counts.study + counts.note > 0;
+  const progress = numPages ? Math.min(100, Math.round((currentPage / numPages) * 100)) : 0;
+  const activeOption = CATEGORY_OPTIONS.find((option) => option.value === category)!;
 
   useEffect(() => {
     return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
   }, [blobUrl]);
 
   useEffect(() => {
     const node = viewerRef.current;
-    if (!node) {
-      return;
-    }
-
-    const updateWidth = () => {
-      setPageWidth(Math.max(300, Math.min(node.clientWidth - 40, 900)));
-    };
-
+    if (!node) return;
+    const updateWidth = () => setPageWidth(Math.max(280, Math.min(node.clientWidth - 68, 900)));
     updateWidth();
     const observer = new ResizeObserver(updateWidth);
     observer.observe(node);
@@ -160,10 +155,7 @@ export function SplitStudyWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!numPages || didResumeRef.current) {
-      return;
-    }
-
+    if (!numPages || didResumeRef.current) return;
     const page = Math.max(1, Math.min(initialPage || 1, numPages));
     const timeoutId = window.setTimeout(() => {
       const node = viewerRef.current;
@@ -175,69 +167,53 @@ export function SplitStudyWorkspace({
       onCurrentPageChange(page);
       didResumeRef.current = true;
     }, 180);
-
     return () => window.clearTimeout(timeoutId);
   }, [initialPage, numPages, onCurrentPageChange]);
 
   useEffect(() => {
     const node = viewerRef.current;
-    if (!node || !numPages) {
-      return;
-    }
-
+    if (!node || !numPages) return;
     const ratios = new Map<number, number>();
     const observer = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
+        entries.forEach((entry) => {
           const page = Number((entry.target as HTMLElement).dataset.pdfPage);
           ratios.set(page, entry.isIntersecting ? entry.intersectionRatio : 0);
-        }
-
+        });
         const visible = [...ratios.entries()].sort((a, b) => b[1] - a[1])[0];
-        if (visible && visible[1] > 0) {
-          onCurrentPageChange(visible[0]);
-        }
+        if (visible && visible[1] > 0) onCurrentPageChange(visible[0]);
       },
       { root: node, threshold: [0, 0.2, 0.45, 0.7] },
     );
-
     node.querySelectorAll<HTMLElement>("[data-pdf-page]").forEach((page) => observer.observe(page));
     return () => observer.disconnect();
   }, [numPages, onCurrentPageChange]);
 
   useEffect(() => {
     if (!autoScroll) {
-      if (scrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollFrameRef.current);
-      }
+      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
       lastFrameAtRef.current = null;
       return;
     }
-
     const tick = (time: number) => {
       const node = viewerRef.current;
       if (!node) {
         setAutoScroll(false);
         return;
       }
-
       const previous = lastFrameAtRef.current ?? time;
       const deltaSeconds = Math.min(0.05, (time - previous) / 1000);
       lastFrameAtRef.current = time;
       node.scrollTop += scrollSpeed * deltaSeconds;
-
       if (node.scrollTop + node.clientHeight >= node.scrollHeight - 2) {
         setAutoScroll(false);
         return;
       }
       scrollFrameRef.current = window.requestAnimationFrame(tick);
     };
-
     scrollFrameRef.current = window.requestAnimationFrame(tick);
     return () => {
-      if (scrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(scrollFrameRef.current);
-      }
+      if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
     };
   }, [autoScroll, scrollSpeed]);
 
@@ -247,16 +223,11 @@ export function SplitStudyWorkspace({
 
   const submitDraft = async () => {
     const content = draft.trim();
-    if (!content || isFinishing) {
-      return;
-    }
-
+    if (!content || isFinishing) return;
     setDraft("");
     textareaRef.current?.focus();
     const saved = await onSubmit(content, category);
-    if (!saved) {
-      setDraft((current) => current || content);
-    }
+    if (!saved) setDraft((current) => current || content);
   };
 
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -266,253 +237,197 @@ export function SplitStudyWorkspace({
     }
   };
 
+  const cycleCategory = (chunk: TypedCaptureChunk) => {
+    const currentIndex = CATEGORY_OPTIONS.findIndex((option) => option.value === chunk.category);
+    const next = CATEGORY_OPTIONS[(currentIndex + 1) % CATEGORY_OPTIONS.length];
+    void onCategoryChange(chunk.id, next.value);
+  };
+
   return (
-    <div className="overflow-hidden rounded-[28px] border border-[var(--border-soft)] bg-white/80 shadow-[var(--shadow-panel)] xl:h-[calc(100vh-7.5rem)] xl:min-h-[700px]">
-      <div className="grid h-full xl:grid-cols-[minmax(0,1.78fr)_minmax(360px,1fr)]">
-        <section className="flex min-h-[70vh] min-w-0 flex-col bg-[linear-gradient(180deg,#eeece5,#e7e4db)] xl:min-h-0">
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-black/8 bg-white/82 px-5 py-4 backdrop-blur-xl">
-            <div className="min-w-0">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.17em] text-[var(--primary)]">
-                <BookOpenText className="size-4" />
-                Textbook
-              </p>
-              <h1 className="mt-1 truncate font-display text-xl font-bold tracking-[-0.035em] text-[var(--foreground)]">
-                {title}
-              </h1>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-2 text-xs font-semibold text-[var(--foreground-soft)]">
-                Page {currentPage || 1}{numPages ? ` of ${numPages}` : ""}
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={onMarkPage}
-                disabled={!blobUrl || Boolean(error) || isMarking}
-                aria-label={`Mark page ${currentPage || 1} as the resume point`}
-              >
-                <Bookmark
-                  className={cn(
-                    "size-4",
-                    markedPage === currentPage && "fill-current",
-                  )}
-                />
-                {isMarking
-                  ? "Marking..."
-                  : markedPage === currentPage
-                    ? "Page marked"
-                    : "Mark this page"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => setAutoScroll((value) => !value)}
-                disabled={!blobUrl || Boolean(error)}
-                aria-pressed={autoScroll}
-              >
-                {autoScroll ? <Pause className="size-4" /> : <Play className="size-4" />}
-                {autoScroll ? "Pause" : "Auto-scroll"}
-              </Button>
-              <label className="flex items-center gap-2 text-xs font-medium text-[var(--muted-foreground)]">
-                <span className="sr-only">Auto-scroll speed</span>
-                <input
-                  type="range"
-                  min={4}
-                  max={36}
-                  step={1}
-                  value={scrollSpeed}
-                  onChange={(event) => setScrollSpeed(Number(event.target.value))}
-                  className="h-2 w-24 cursor-pointer accent-[var(--primary)]"
-                />
-                <span className="w-10 tabular-nums">{scrollSpeed}px/s</span>
-              </label>
-            </div>
-          </header>
-
-          <div
-            ref={viewerRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth px-4 py-5"
-            aria-label="Scrollable textbook pages"
-          >
-            {isLoading ? (
-              <ReaderMessage>Preparing the textbook...</ReaderMessage>
-            ) : error ? (
-              <ReaderMessage tone="error">{error}</ReaderMessage>
-            ) : !blobUrl ? (
-              <ReaderMessage>No PDF preview is available.</ReaderMessage>
-            ) : (
-              <PdfDocument
-                file={blobUrl}
-                options={PDF_OPTIONS}
-                onLoadSuccess={({ numPages: pages }) => setNumPages(pages)}
-                loading={<ReaderMessage>Rendering pages...</ReaderMessage>}
-                error={<ReaderMessage tone="error">The PDF could not be rendered.</ReaderMessage>}
-              >
-                <div className="mx-auto flex max-w-[940px] flex-col gap-6">
-                  {Array.from({ length: numPages }, (_, index) => {
-                    const page = index + 1;
-                    const isResumePage = markedPage > 0 && page === markedPage;
-                    return (
-                      <article
-                        key={page}
-                        data-pdf-page={page}
-                        className={cn(
-                          "relative scroll-mt-4 rounded-[24px] border bg-white p-3 shadow-[0_18px_42px_rgba(28,27,27,0.10)]",
-                          isResumePage ? "border-amber-400/70 ring-4 ring-amber-200/35" : "border-black/8",
-                        )}
-                      >
-                        <div className="mb-3 flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--muted-foreground)]">
-                          <span>Page {page}</span>
-                          {isResumePage ? (
-                            <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-amber-900">
-                              <Bookmark className="size-3.5 fill-current" />
-                              Saved marker
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="overflow-hidden rounded-[16px] border border-black/6 bg-white">
-                          <Page
-                            pageNumber={page}
-                            width={pageWidth}
-                            renderAnnotationLayer
-                            renderTextLayer
-                          />
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </PdfDocument>
-            )}
-          </div>
-        </section>
-
-        <section className="flex min-h-[720px] min-w-0 flex-col border-t border-[var(--border-soft)] bg-[#fbfaf6] xl:min-h-0 xl:border-l xl:border-t-0">
-          <header className="border-b border-[var(--border-soft)] bg-white/88 px-5 py-4 backdrop-blur-xl">
-            <div className="flex items-start justify-between gap-4">
+    <div className="reader-workspace">
+      <section className="reader-pdf-pane">
+        <header className="reader-pdf-toolbar">
+          <div className="reader-pdf-title-row">
+            <div className="reader-pdf-title">
+              <Link href="/capture" className="reader-shelf-link">‹ Shelf</Link>
               <div>
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.17em] text-[var(--primary)]">
-                  <MessageSquareText className="size-4" />
-                  Capture stream
-                </p>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                  Send one thought at a time. You can change its role before processing.
-                </p>
-              </div>
-              <div className="shrink-0 rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-3 py-2 text-right">
-                <p className="flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                  <Clock3 className="size-3.5" /> Time
-                </p>
-                <p className="mt-1 font-display text-xl font-bold tabular-nums text-[var(--foreground)]">{elapsed}</p>
+                <h1>{title}</h1>
+                <p><BookOpenText aria-hidden="true" /> Shelf · {numPages || "—"} pp. · Page {currentPage || 1} of {numPages || "—"}</p>
               </div>
             </div>
-
-            <Button
+            <button
               type="button"
-              className="mt-4 w-full"
-              onClick={onFinish}
-              disabled={!hasProcessableChunks || isFinishing || isSaving}
+              className={markedPage === currentPage ? "reader-mark-button is-marked" : "reader-mark-button"}
+              onClick={onMarkPage}
+              disabled={!blobUrl || Boolean(error) || isMarking}
             >
-              <Sparkles className={cn("size-4", isFinishing && "animate-pulse")} />
-              {processingStage ?? (isFinishing ? "Processing session..." : "End session & create study set")}
-            </Button>
-            {!hasProcessableChunks ? (
-              <p className="mt-2 text-center text-xs text-[var(--muted-foreground)]">
-                Add at least one study-material or note-only chunk to finish.
-              </p>
-            ) : null}
-          </header>
-
-          <div ref={timelineRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-5">
-            {chunks.length === 0 ? (
-              <div className="flex h-full min-h-52 flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--border-soft)] bg-white/55 px-6 text-center">
-                <MessageSquareText className="size-7 text-[var(--primary)]" />
-                <p className="mt-3 font-semibold text-[var(--foreground)]">Your reading trail starts here</p>
-                <p className="mt-2 max-w-xs text-sm leading-6 text-[var(--muted-foreground)]">
-                  Capture facts, private notes, or directions for the AI without leaving the page.
-                </p>
-              </div>
-            ) : (
-              chunks.map((chunk, index) => {
-                const option = CATEGORY_OPTIONS.find((item) => item.value === chunk.category)!;
-                const Icon = option.icon;
-                return (
-                  <article key={chunk.id} className={cn("rounded-[20px] border p-4 transition-colors", option.bubbleClass)}>
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--foreground-soft)]">
-                        <Icon className="size-3.5" />
-                        {option.label}
-                      </p>
-                      <span className="text-[10px] tabular-nums text-[var(--muted-foreground)]">#{index + 1}</span>
-                    </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--foreground)]">{chunk.content}</p>
-                    <div className="mt-4 flex items-center gap-1 rounded-xl bg-white/62 p-1" aria-label={`Change category for chunk ${index + 1}`}>
-                      {CATEGORY_OPTIONS.map((categoryOption) => {
-                        const CategoryIcon = categoryOption.icon;
-                        const selected = categoryOption.value === chunk.category;
-                        return (
-                          <button
-                            key={categoryOption.value}
-                            type="button"
-                            onClick={() => void onCategoryChange(chunk.id, categoryOption.value)}
-                            disabled={isFinishing}
-                            aria-label={`Mark as ${categoryOption.label}`}
-                            aria-pressed={selected}
-                            title={categoryOption.label}
-                            className={cn(
-                              "flex h-8 flex-1 items-center justify-center rounded-lg border border-transparent transition disabled:opacity-50",
-                              selected ? categoryOption.activeClass : "text-[var(--muted-foreground)] hover:bg-white",
-                            )}
-                          >
-                            <CategoryIcon className="size-3.5" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </article>
-                );
-              })
-            )}
+              <Bookmark aria-hidden="true" />
+              {isMarking ? "Marking…" : markedPage === currentPage ? "Spot marked" : "Mark my spot"}
+            </button>
           </div>
 
-          <footer className="border-t border-[var(--border-soft)] bg-white/92 p-4 backdrop-blur-xl">
-            <CategorySelector value={category} onChange={setCategory} disabled={isFinishing} />
-            <div className="mt-3 flex items-end gap-2">
-              <Textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={handleComposerKeyDown}
-                maxLength={4000}
-                rows={3}
-                disabled={isFinishing}
-                placeholder="Type a thought… Enter to send, Shift+Enter for a new line"
-                className="min-h-24 resize-none bg-[#f7f6f1]"
-                aria-label="Capture a reading thought"
+          <div className="reader-scroll-controls">
+            <button
+              type="button"
+              className={autoScroll ? "reader-auto-button is-active" : "reader-auto-button"}
+              onClick={() => setAutoScroll((value) => !value)}
+              disabled={!blobUrl || Boolean(error)}
+              aria-pressed={autoScroll}
+            >
+              {autoScroll ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+              {autoScroll ? "Pause auto-scroll" : "Auto-scroll"}
+            </button>
+            <label>
+              <span>Slow</span>
+              <input
+                type="range"
+                min={4}
+                max={36}
+                step={1}
+                value={scrollSpeed}
+                onChange={(event) => setScrollSpeed(Number(event.target.value))}
+                aria-label="Auto-scroll speed"
               />
-              <Button
-                type="button"
-                size="icon"
-                onClick={() => void submitDraft()}
-                disabled={!draft.trim() || isFinishing}
-                aria-label="Save chunk"
-              >
-                <Send className="size-4" />
-              </Button>
+              <span>Fast</span>
+              <strong>×{Math.max(1, Math.round(scrollSpeed / 4))}</strong>
+            </label>
+          </div>
+          <div className="reader-page-progress"><i style={{ width: `${progress}%` }} /></div>
+        </header>
+
+        <div ref={viewerRef} className="reader-pdf-scroll" aria-label="Scrollable textbook pages">
+          {isLoading ? (
+            <ReaderMessage>Preparing the textbook…</ReaderMessage>
+          ) : error ? (
+            <ReaderMessage tone="error">{error}</ReaderMessage>
+          ) : !blobUrl ? (
+            <ReaderMessage>No PDF preview is available.</ReaderMessage>
+          ) : (
+            <PdfDocument
+              file={blobUrl}
+              options={PDF_OPTIONS}
+              onLoadSuccess={({ numPages: pages }) => setNumPages(pages)}
+              loading={<ReaderMessage>Rendering pages…</ReaderMessage>}
+              error={<ReaderMessage tone="error">The PDF could not be rendered.</ReaderMessage>}
+            >
+              <div className="reader-pdf-pages">
+                {Array.from({ length: numPages }, (_, index) => {
+                  const page = index + 1;
+                  const isResumePage = markedPage > 0 && page === markedPage;
+                  return (
+                    <article key={page} data-pdf-page={page} className="reader-pdf-page">
+                      {isResumePage ? <span className="reader-page-ribbon" title="Saved marker" /> : null}
+                      <div className="reader-pdf-page-label">
+                        <span>Page {page}</span>
+                        {isResumePage ? <strong><Bookmark aria-hidden="true" /> Saved marker</strong> : null}
+                      </div>
+                      <div className="reader-pdf-canvas">
+                        <Page pageNumber={page} width={pageWidth} renderAnnotationLayer renderTextLayer />
+                      </div>
+                      <p className="reader-page-number">— {page} —</p>
+                    </article>
+                  );
+                })}
+              </div>
+            </PdfDocument>
+          )}
+        </div>
+      </section>
+
+      <section className="reader-capture-pane">
+        <header className="reader-capture-header">
+          <div className="reader-capture-summary">
+            <div className="reader-clock">
+              <span><i /><b /></span>
+              <div><small>On the clock</small><strong>{elapsed}</strong></div>
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-[var(--muted-foreground)]">
-              <span>{CATEGORY_OPTIONS.find((item) => item.value === category)?.description}</span>
-              <span className="flex shrink-0 items-center gap-2 tabular-nums">
-                <span aria-live="polite">{isSaving ? "Syncing..." : "Saved"}</span>
-                <span>{draft.length}/4000</span>
-              </span>
+            <div className="reader-counts">
+              <span className="is-study">{counts.study} card</span>
+              <span className="is-note">{counts.note} note</span>
+              <span className="is-ai">{counts.ai} dir</span>
             </div>
-          </footer>
-        </section>
-      </div>
+          </div>
+          <button
+            type="button"
+            className="reader-finish-button"
+            onClick={onFinish}
+            disabled={!hasProcessableChunks || isFinishing || isSaving}
+          >
+            <Sparkles aria-hidden="true" />
+            {processingStage ?? (isFinishing ? "Processing session…" : "End session & create study set")}
+          </button>
+          <p className="reader-finish-hint">
+            {!hasProcessableChunks
+              ? "Add at least one study-material or note-only chunk to finish."
+              : isSaving
+                ? "Syncing your latest changes…"
+                : "Sends the trail to the AI for note + flashcard generation."}
+          </p>
+        </header>
+
+        <div ref={timelineRef} className="reader-stream">
+          {chunks.length === 0 ? (
+            <div className="reader-stream-empty">
+              <MessageSquareText aria-hidden="true" />
+              <h2>Your reading trail starts here.</h2>
+              <p>Capture facts, private notes, or directions for the AI—without leaving the page. Pick a category below, type, and hit Enter.</p>
+            </div>
+          ) : (
+            chunks.map((chunk, index) => {
+              const option = CATEGORY_OPTIONS.find((item) => item.value === chunk.category)!;
+              return (
+                <article key={chunk.id} className={`reader-chunk is-${option.tone}`}>
+                  <div className="reader-chunk-meta">
+                    <button type="button" onClick={() => cycleCategory(chunk)} title="Click to recategorize">
+                      {option.label} ⇄
+                    </button>
+                    <span>#{index + 1} · {formatChunkTime(chunk.created_at)}</span>
+                    <button
+                      type="button"
+                      className="reader-chunk-remove"
+                      onClick={() => void onRemove(chunk.id)}
+                      disabled={isFinishing}
+                      aria-label={`Discard chunk ${index + 1}`}
+                    >
+                      <X aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p>{chunk.content}</p>
+                </article>
+              );
+            })
+          )}
+        </div>
+
+        <footer className={`reader-composer is-${activeOption.tone}`}>
+          <CategorySelector value={category} onChange={setCategory} disabled={isFinishing} />
+          <div className="reader-compose-box">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              maxLength={4000}
+              rows={3}
+              disabled={isFinishing}
+              placeholder={composerPlaceholder(category)}
+              aria-label="Capture a reading thought"
+            />
+            <button
+              type="button"
+              onClick={() => void submitDraft()}
+              disabled={!draft.trim() || isFinishing}
+              aria-label="Save chunk"
+            >
+              <Send aria-hidden="true" />
+            </button>
+          </div>
+          <div className="reader-compose-status">
+            <span>Enter to send · Shift+Enter for a new line</span>
+            <span aria-live="polite">{isSaving ? "Syncing…" : activeOption.description} · {draft.length}/4000</span>
+          </div>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -527,24 +442,21 @@ function CategorySelector({
   disabled: boolean;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1 rounded-[16px] border border-[var(--border-soft)] bg-[var(--panel-soft)] p-1" aria-label="Chunk category">
+    <div className="reader-category-tabs" aria-label="Chunk category">
       {CATEGORY_OPTIONS.map((option) => {
         const Icon = option.icon;
-        const selected = option.value === value;
         return (
           <button
             key={option.value}
             type="button"
+            className={`is-${option.tone}${option.value === value ? " is-active" : ""}`}
             onClick={() => onChange(option.value)}
             disabled={disabled}
-            aria-pressed={selected}
-            className={cn(
-              "flex min-w-0 flex-col items-center gap-1 rounded-xl border border-transparent px-2 py-2 text-center transition disabled:opacity-50",
-              selected ? option.activeClass : "text-[var(--muted-foreground)] hover:bg-white/80",
-            )}
+            aria-pressed={option.value === value}
+            title={option.description}
           >
-            <Icon className="size-4" />
-            <span className="truncate text-[10px] font-bold uppercase tracking-[0.08em]">{option.label}</span>
+            <span><Icon aria-hidden="true" /> {option.label}</span>
+            <small>{option.sub}</small>
           </button>
         );
       })}
@@ -553,14 +465,17 @@ function CategorySelector({
 }
 
 function ReaderMessage({ children, tone = "default" }: { children: React.ReactNode; tone?: "default" | "error" }) {
-  return (
-    <div
-      className={cn(
-        "mx-auto flex min-h-52 max-w-xl items-center justify-center rounded-[24px] border border-dashed bg-white/75 px-6 text-center text-sm",
-        tone === "error" ? "border-rose-300 text-rose-800" : "border-black/10 text-[var(--muted-foreground)]",
-      )}
-    >
-      {children}
-    </div>
-  );
+  return <div className={`reader-message${tone === "error" ? " is-error" : ""}`}>{children}</div>;
+}
+
+function formatChunkTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "saved";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function composerPlaceholder(category: TypedChunkCategory) {
+  if (category === "ai_direction") return "A direction for the AI—e.g. ‘focus cards on causes, not dates’…";
+  if (category === "note_only") return "A note to keep (won’t become a card)…";
+  return "A fact worth a flashcard… Enter to send";
 }

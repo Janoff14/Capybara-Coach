@@ -81,7 +81,7 @@ export default function StudyReadPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="catalog-study-page space-y-8">
       <PageHeader
         eyebrow="Study session"
         title={document?.title ?? "Read the source"}

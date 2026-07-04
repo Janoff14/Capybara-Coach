@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -77,6 +78,7 @@ export default function StudyCapturePage() {
   const [pendingSaveCount, setPendingSaveCount] = useState(0);
   const [isMarking, setIsMarking] = useState(false);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
+  const [completedNoteId, setCompletedNoteId] = useState<string | null | undefined>(undefined);
   const hydratedRef = useRef(false);
   const didInitializePageRef = useRef(false);
   const chunksRef = useRef<TypedCaptureChunk[]>([]);
@@ -167,6 +169,13 @@ export default function StudyCapturePage() {
     queueChunkSave(nextChunks);
   };
 
+  const handleRemove = async (chunkId: string) => {
+    const nextChunks = chunksRef.current.filter((chunk) => chunk.id !== chunkId);
+    chunksRef.current = nextChunks;
+    setChunks(nextChunks);
+    queueChunkSave(nextChunks);
+  };
+
   const handleMarkPage = async () => {
     if (!token || !documentId) {
       toast.error("The textbook is not ready to save a marker yet.");
@@ -210,7 +219,7 @@ export default function StudyCapturePage() {
         queryClient.invalidateQueries({ queryKey: ["flashcards"] }),
       ]);
       toast.success("Your note, flashcards, and resume point are ready.");
-      router.push(session.note ? `/notes/${session.note.id}` : "/notes");
+      setCompletedNoteId(session.note?.id ?? null);
     },
     onError: (error) => {
       toast.error(errorMessage(error, "Session processing stopped. Your chunks are still saved."));
@@ -225,26 +234,58 @@ export default function StudyCapturePage() {
       ? "The original PDF could not be loaded from the backend."
       : null;
 
+  const counts = {
+    study: chunks.filter((chunk) => chunk.category === "study_material").length,
+    note: chunks.filter((chunk) => chunk.category === "note_only").length,
+    ai: chunks.filter((chunk) => chunk.category === "ai_direction").length,
+  };
+
   return (
-    <SplitStudyWorkspace
-      blob={documentFileQuery.data ?? null}
-      chunks={chunks}
-      currentPage={currentPage}
-      elapsed={stopwatch.formatted}
-      error={loadError}
-      initialPage={document?.last_read_page || 1}
-      isFinishing={finishMutation.isPending}
-      isLoading={sessionQuery.isLoading || documentQuery.isLoading || documentFileQuery.isLoading}
-      isMarking={isMarking}
-      isSaving={pendingSaveCount > 0}
-      markedPage={manualMarkerPage ?? document?.last_read_page ?? 0}
-      onCategoryChange={handleCategoryChange}
-      onCurrentPageChange={setCurrentPage}
-      onFinish={() => finishMutation.mutate()}
-      onMarkPage={() => void handleMarkPage()}
-      onSubmit={handleSubmit}
-      processingStage={processingStage}
-      title={document?.title ?? "Read & note"}
-    />
+    <>
+      <SplitStudyWorkspace
+        blob={documentFileQuery.data ?? null}
+        chunks={chunks}
+        currentPage={currentPage}
+        elapsed={stopwatch.formatted}
+        error={loadError}
+        initialPage={document?.last_read_page || 1}
+        isFinishing={finishMutation.isPending}
+        isLoading={sessionQuery.isLoading || documentQuery.isLoading || documentFileQuery.isLoading}
+        isMarking={isMarking}
+        isSaving={pendingSaveCount > 0}
+        markedPage={manualMarkerPage ?? document?.last_read_page ?? 0}
+        onCategoryChange={handleCategoryChange}
+        onCurrentPageChange={setCurrentPage}
+        onFinish={() => finishMutation.mutate()}
+        onMarkPage={() => void handleMarkPage()}
+        onRemove={handleRemove}
+        onSubmit={handleSubmit}
+        processingStage={processingStage}
+        title={document?.title ?? "Read & note"}
+      />
+
+      {completedNoteId !== undefined ? (
+        <div className="reader-filed-backdrop" role="dialog" aria-modal="true" aria-labelledby="reader-filed-title">
+          <div className="reader-filed-card">
+            <div className="reader-filed-stamp">Sent to AI</div>
+            <h2 id="reader-filed-title">Session filed.</h2>
+            <p>
+              The AI turned your trail from “{document?.title ?? "this textbook"}” into a polished note and a fresh flashcard deck.
+            </p>
+            <div className="reader-filed-summary">
+              <span className="is-study">▸ {counts.study} chunks → flashcards</span>
+              <span className="is-note">▸ {counts.note} chunks → polished note</span>
+              <span className="is-ai">▸ {counts.ai} AI directions applied</span>
+              <span className="reader-filed-marker">⚑ Bookmark saved at page {manualMarkerPage ?? currentPage}—you’ll resume here.</span>
+            </div>
+            <div className="reader-filed-actions">
+              <Link href={completedNoteId ? `/notes/${completedNoteId}` : "/notes"} className="is-note-action">See the note</Link>
+              <Link href="/practice" className="is-practice-action">Drill the deck</Link>
+              <button type="button" onClick={() => router.push("/capture")}>Back to shelf</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -23,12 +23,14 @@ import type { DocumentRead } from "@/lib/types";
 type UploadDocumentDialogProps = {
   buttonLabel?: string;
   buttonVariant?: "default" | "secondary" | "ghost";
+  buttonClassName?: string;
   onUploaded?: (document: DocumentRead) => void;
 };
 
 export function UploadDocumentDialog({
   buttonLabel = "Upload document",
   buttonVariant = "default",
+  buttonClassName,
   onUploaded,
 }: UploadDocumentDialogProps) {
   const queryClient = useQueryClient();
@@ -76,7 +78,7 @@ export function UploadDocumentDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant={buttonVariant}>
+        <Button variant={buttonVariant} className={buttonClassName}>
           <FileUp className="size-4" />
           {buttonLabel}
         </Button>

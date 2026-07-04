@@ -3,542 +3,120 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
-import {
-  ArrowRight,
-  Bookmark,
-  CalendarClock,
-  Clock3,
-  FileText,
-  MessageSquareText,
-  NotebookPen,
-  PanelsTopLeft,
-  Sparkles,
-} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { ArrowRight, BookOpenText, CalendarClock, NotebookPen, PanelsTopLeft } from "lucide-react";
 
-import { EmptyState } from "@/components/app/empty-state";
-import { MetricCard } from "@/components/app/metric-card";
-import { SessionStatusBadge } from "@/components/app/session-status-badge";
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
 import { useAuth } from "@/components/providers/auth-provider";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { groupFlashcardsIntoDecks } from "@/lib/flashcards";
-import type {
-  DocumentRead,
-  FlashcardRead,
-  NoteRead,
-  ReviewScheduleRead,
-  StudySessionRead,
-} from "@/lib/types";
-
-const EMPTY_DOCUMENTS: DocumentRead[] = [];
-const EMPTY_SESSIONS: StudySessionRead[] = [];
-const EMPTY_NOTES: NoteRead[] = [];
-const EMPTY_FLASHCARDS: FlashcardRead[] = [];
-const EMPTY_REVIEWS: ReviewScheduleRead[] = [];
 
 export default function DashboardPage() {
   const { token } = useAuth();
+  const documentsQuery = useQuery({ queryKey: ["documents"], enabled: Boolean(token), queryFn: () => api.getDocuments(token!) });
+  const sessionsQuery = useQuery({ queryKey: ["sessions"], enabled: Boolean(token), queryFn: () => api.getSessions(token!) });
+  const notesQuery = useQuery({ queryKey: ["notes"], enabled: Boolean(token), queryFn: () => api.getNotes(token!) });
+  const flashcardsQuery = useQuery({ queryKey: ["flashcards"], enabled: Boolean(token), queryFn: () => api.getFlashcards(token!) });
+  const reviewsQuery = useQuery({ queryKey: ["reviews"], enabled: Boolean(token), queryFn: () => api.getReviews(token!) });
 
-  const documentsQuery = useQuery({
-    queryKey: ["documents"],
-    enabled: Boolean(token),
-    queryFn: () => api.getDocuments(token!),
-  });
-
-  const sessionsQuery = useQuery({
-    queryKey: ["sessions"],
-    enabled: Boolean(token),
-    queryFn: () => api.getSessions(token!),
-  });
-
-  const notesQuery = useQuery({
-    queryKey: ["notes"],
-    enabled: Boolean(token),
-    queryFn: () => api.getNotes(token!),
-  });
-
-  const flashcardsQuery = useQuery({
-    queryKey: ["flashcards"],
-    enabled: Boolean(token),
-    queryFn: () => api.getFlashcards(token!),
-  });
-
-  const reviewsQuery = useQuery({
-    queryKey: ["reviews"],
-    enabled: Boolean(token),
-    queryFn: () => api.getReviews(token!),
-  });
-
-  const documents = documentsQuery.data ?? EMPTY_DOCUMENTS;
-  const sessions = sessionsQuery.data ?? EMPTY_SESSIONS;
-  const notes = notesQuery.data ?? EMPTY_NOTES;
-  const flashcards = flashcardsQuery.data ?? EMPTY_FLASHCARDS;
-  const reviews = reviewsQuery.data ?? EMPTY_REVIEWS;
-  const practiceDecks = useMemo(
-    () => groupFlashcardsIntoDecks(flashcards),
-    [flashcards],
-  );
-  const dueReviews = useMemo(
-    () => reviews.filter((review) => review.is_due),
-    [reviews],
-  );
-  const upcomingReviews = useMemo(
-    () => reviews.filter((review) => !review.is_due),
-    [reviews],
-  );
-
-  const documentMap = useMemo(
-    () => new Map(documents.map((document) => [document.id, document])),
-    [documents],
-  );
-
-  const isLoading =
-    documentsQuery.isLoading ||
-    sessionsQuery.isLoading ||
-    notesQuery.isLoading ||
-    flashcardsQuery.isLoading ||
-    reviewsQuery.isLoading;
-  const hasError =
-    documentsQuery.error ||
-    sessionsQuery.error ||
-    notesQuery.error ||
-    flashcardsQuery.error ||
-    reviewsQuery.error;
+  const documents = documentsQuery.data ?? [];
+  const sessions = sessionsQuery.data ?? [];
+  const notes = notesQuery.data ?? [];
+  const decks = useMemo(() => groupFlashcardsIntoDecks(flashcardsQuery.data ?? []), [flashcardsQuery.data]);
+  const dueReviews = (reviewsQuery.data ?? []).filter((review) => review.is_due);
+  const documentMap = new Map(documents.map((document) => [document.id, document]));
+  const hasError = [documentsQuery, sessionsQuery, notesQuery, flashcardsQuery, reviewsQuery].some((query) => query.isError);
+  const isLoading = [documentsQuery, sessionsQuery, notesQuery, flashcardsQuery, reviewsQuery].some((query) => query.isLoading);
 
   return (
-    <div className="space-y-10">
-      <section className="editorial-panel overflow-hidden rounded-[32px] border border-[var(--border-soft)] p-8 sm:p-10">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--tertiary)]">
-              Dashboard
-            </p>
-            <h1 className="mt-4 font-display text-4xl font-extrabold tracking-[-0.06em] text-[var(--foreground)] sm:text-5xl">
-              Everything you need for the{" "}
-              <span className="italic text-[var(--primary)]">next study loop.</span>
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-[var(--foreground-soft)]">
-              Keep the workflow tight: upload source material, start a recall session,
-              assess what came back, and turn the result into notes and practice you
-              can actually revisit later.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <UploadDocumentDialog />
-            <Button asChild>
-              <Link href="/capture">
-                <MessageSquareText className="size-4" />
-                Read & note
-              </Link>
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link href="/documents">Documents</Link>
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link href="/practice">Open practice</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section className="surface-grid-3">
-        <MetricCard
-          label="Documents"
-          value={documents.length.toString()}
-          hint="Stored study sources ready to turn into sessions."
-          icon={<FileText className="size-4" />}
-          tone="primary"
-        />
-        <MetricCard
-          label="Sessions"
-          value={sessions.length.toString()}
-          hint="Reading, recording, and assessment runs tied to your account."
-          icon={<Clock3 className="size-4" />}
-          tone="secondary"
-        />
-        <MetricCard
-          label="Notes"
-          value={notes.length.toString()}
-          hint="Saved outputs you can revisit once a session is complete."
-          icon={<NotebookPen className="size-4" />}
-          tone="tertiary"
-        />
-        <MetricCard
-          label="Due Reviews"
-          value={dueReviews.length.toString()}
-          hint="Decks ready to be reviewed again today."
-          icon={<CalendarClock className="size-4" />}
-          tone={dueReviews.length > 0 ? "danger" : "primary"}
-        />
-      </section>
-
-      {hasError ? (
-        <EmptyState
-          title="We could not load your dashboard."
-          description="The backend did not return one of the recent activity lists. Double-check your API base URL and that the Railway backend is up."
-        />
-      ) : null}
-
-      <section className="surface-grid lg:grid-cols-[1.2fr_1fr_1fr] lg:grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent documents</CardTitle>
-            <CardDescription>
-              Upload PDFs and jump straight into a session from the documents
-              page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Loading recent documents...</p>
-            ) : documents.length === 0 ? (
-              <EmptyState
-                title="No documents yet"
-                description="Upload your first PDF to start a study session."
-                action={<UploadDocumentDialog buttonLabel="Upload your first PDF" />}
-              />
-            ) : (
-              documents.slice(0, 3).map((document) => (
-                <div
-                  key={document.id}
-                  className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[var(--foreground)]">{document.title}</p>
-                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                        {document.page_count} page
-                        {document.page_count === 1 ? "" : "s"} -{" "}
-                        {document.original_filename}
-                      </p>
-                    </div>
-                    <FileText className="size-5 text-[var(--primary)]" />
-                  </div>
-                  <p className="mt-3 text-xs text-[var(--muted-foreground)]">
-                    Added{" "}
-                    {formatDistanceToNow(new Date(document.created_at), {
-                      addSuffix: true,
-                    })}
-                  </p>
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[rgba(75,102,72,0.10)]">
-                      <div
-                        className="h-full rounded-full bg-[var(--primary)]"
-                        style={{ width: `${document.progress_percent}%` }}
-                      />
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[var(--muted-foreground)]">
-                      <Bookmark className="size-3" />
-                      {document.last_read_page > 0
-                        ? `Page ${document.last_read_page} · ${document.progress_percent}%`
-                        : "Not started"}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent sessions</CardTitle>
-            <CardDescription>
-              Follow status changes from reading through notes generation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Loading recent sessions...</p>
-            ) : sessions.length === 0 ? (
-              <EmptyState
-                title="No sessions yet"
-                description="Create one from a document to begin the recall flow."
-              />
-            ) : (
-              sessions.slice(0, 3).map((session) => (
-                <Link
-                  key={session.id}
-                  href={`/study/${session.id}/read`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-[var(--foreground)]">
-                        {documentMap.get(session.document_id)?.title ??
-                          "Study session"}
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                        Session {session.id.slice(0, 8)}
-                      </p>
-                    </div>
-                    <SessionStatusBadge status={session.status} />
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
-                    <Clock3 className="size-3.5" />
-                    Updated{" "}
-                    {formatDistanceToNow(new Date(session.updated_at), {
-                      addSuffix: true,
-                    })}
-                  </div>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent notes</CardTitle>
-            <CardDescription>
-              Final outputs from assessed recall sessions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Loading recent notes...</p>
-            ) : notes.length === 0 ? (
-              <EmptyState
-                title="No notes saved"
-                description="Finish one full session to generate your first clean note."
-              />
-            ) : (
-              notes.slice(0, 3).map((note) => (
-                <Link
-                  key={note.id}
-                  href={`/notes/${note.id}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[var(--foreground)]">{note.title}</p>
-                      <p className="mt-2 line-clamp-3 text-sm text-[var(--muted-foreground)]">
-                        {note.summary}
-                      </p>
-                    </div>
-                    <NotebookPen className="size-5 shrink-0 text-[var(--primary)]" />
-                  </div>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(244,244,238,0.92)_100%)]">
-        <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-display text-xl font-bold tracking-[-0.03em] text-[var(--foreground)]">
-              Want the cleanest demo path?
-            </p>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              Upload a PDF, start a session from Documents, then follow the
-              reading and recording steps straight through.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/documents">
-              Open documents
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
-
-      <section className="surface-grid lg:grid-cols-[1.15fr_0.85fr] lg:grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Practice</CardTitle>
-            <CardDescription>
-              Review the generated flashcards instead of rereading everything from scratch.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Loading practice decks...</p>
-            ) : practiceDecks.length === 0 ? (
-              <EmptyState
-                title="No flashcards yet"
-                description="Generate a deck from an assessed session to start active review."
-                action={
-                  <Button asChild>
-                    <Link href="/practice">Open practice</Link>
-                  </Button>
-                }
-              />
-            ) : (
-              practiceDecks.slice(0, 3).map((deck) => (
-                <Link
-                  key={deck.sessionId}
-                  href={`/practice?sessionId=${deck.sessionId}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[var(--foreground)]">{deck.documentTitle}</p>
-                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                        {deck.cards.length} card{deck.cards.length === 1 ? "" : "s"} ready for recall practice
-                      </p>
-                    </div>
-                    <PanelsTopLeft className="size-5 text-[var(--primary)]" />
-                  </div>
-                  <p className="mt-3 text-xs text-[var(--muted-foreground)]">
-                    Updated{" "}
-                    {formatDistanceToNow(new Date(deck.updatedAt), {
-                      addSuffix: true,
-                    })}
-                  </p>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>How to use this</CardTitle>
-            <CardDescription>
-              Keep the loop active: assess first, then turn the session into a small deck you can actually practice.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              "Finish a session and open the assessment page.",
-              "Generate a flashcard deck from that session.",
-              "Use Practice to reveal answers only after you attempt recall.",
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-3 text-sm leading-7 text-[var(--muted-foreground)]"
-              >
-                {item}
+    <div className="catalog-dashboard">
+      <section className="catalog-dashboard-top">
+        <article className="catalog-ledger">
+          <header>
+            <span>Study ledger · card № 001</span>
+            <span>{format(new Date(), "EEE · MMM d · yyyy")}</span>
+          </header>
+          <h1>What&apos;s on the desk this morning</h1>
+          <p>
+            {documents.length} documents catalogued. {notes.length} notes filed. {dueReviews.length} deck{dueReviews.length === 1 ? "" : "s"} stamped DUE.
+            Keep the loop moving: read, recall, assess, file, drill.
+          </p>
+          <div className="catalog-route-strip">
+            {["READ", "RECALL", "ASSESS", "NOTE", "DRILL"].map((label, index) => (
+              <div key={label} className={index === 1 ? "is-here" : index === 0 ? "is-done" : ""}>
+                <strong>{label}</strong>
+                <span>{index === 0 ? "✓ done" : index === 1 ? "you are here" : index === 4 ? `${dueReviews.length} due` : "up next"}</span>
               </div>
             ))}
-            <Button asChild className="w-full">
-              <Link href="/practice">
-                Go to practice
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="catalog-ledger-actions">
+            <UploadDocumentDialog buttonLabel="Catalog a PDF" buttonClassName="reader-stamp-button" />
+            <Link href="/capture">Open reading room <ArrowRight /></Link>
+          </div>
+        </article>
+
+        <aside className="catalog-due-card">
+          <div className="catalog-due-stamp">{dueReviews.length ? "Due" : "Clear"}</div>
+          <p className="reader-overline">Overdue slip</p>
+          <strong>{dueReviews.length}</strong>
+          <h2>{dueReviews.length === 1 ? "deck wants a word" : "decks want a word"}</h2>
+          <p>{dueReviews.length ? "Retrieval first. Seven cards and the desk is square." : "Nothing overdue. A suspiciously tidy desk."}</p>
+          <Link href="/practice">Go drill →</Link>
+        </aside>
       </section>
 
-      <section className="surface-grid lg:grid-cols-[1fr_1fr] lg:grid">
-        <Card>
-          <CardHeader>
-            <CardTitle>Reviews due</CardTitle>
-            <CardDescription>
-              The shortest path back into retention work.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Loading due reviews...</p>
-            ) : dueReviews.length === 0 ? (
-              <EmptyState
-                title="Nothing due today"
-                description="Once you finish and grade a deck, it will show up here when it comes due again."
-              />
-            ) : (
-              dueReviews.slice(0, 4).map((review) => (
-                <Link
-                  key={review.id}
-                  href={`/practice?sessionId=${review.study_session_id}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[var(--foreground)]">{review.document_title}</p>
-                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                        Due now - last rating {review.last_rating ?? "not graded yet"}
-                      </p>
-                    </div>
-                    <CalendarClock className="size-5 text-[var(--primary)]" />
-                  </div>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
+      {hasError ? <div className="catalog-notice is-error">One of the desk drawers could not be loaded. Check the local API and try again.</div> : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Upcoming reviews</CardTitle>
-            <CardDescription>
-              What is coming back next in the retention queue.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <p className="text-sm text-[var(--muted-foreground)]">Loading upcoming reviews...</p>
-            ) : upcomingReviews.length === 0 ? (
-              <EmptyState
-                title="No future reviews yet"
-                description="Grade a deck after practice and it will be scheduled here."
-              />
-            ) : (
-              upcomingReviews.slice(0, 4).map((review) => (
-                <Link
-                  key={review.id}
-                  href={`/practice?sessionId=${review.study_session_id}`}
-                  className="block rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] p-4 transition-colors hover:bg-[rgba(75,102,72,0.05)]"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[var(--foreground)]">{review.document_title}</p>
-                      <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                        In{" "}
-                        {formatDistanceToNow(new Date(review.next_review_at), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                    </div>
-                    <CalendarClock className="size-5 text-[var(--primary)]" />
-                  </div>
-                </Link>
-              ))
-            )}
-          </CardContent>
-        </Card>
+      <section className="catalog-section-heading">
+        <div><p className="reader-overline">Recently catalogued</p><h2>Cards on the desk</h2></div>
+        <span>{isLoading ? "checking drawers…" : `${documents.length} records`}</span>
       </section>
 
-      {!isLoading && sessions[0] ? (
-        <Card className="overflow-hidden bg-[linear-gradient(180deg,rgba(75,102,72,0.96)_0%,rgba(64,89,61,0.96)_100%)] text-white">
-          <CardContent className="flex flex-col gap-5 py-7 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/72">
-                <Sparkles className="size-3.5" />
-                Resume momentum
-              </p>
-              <p className="mt-3 font-display text-2xl font-bold tracking-[-0.04em]">
-                Continue your most recent study flow.
-              </p>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-white/76">
-                Jump back into{" "}
-                {documentMap.get(sessions[0].document_id)?.title ?? "your latest session"}{" "}
-                and keep the loop moving without starting over.
-              </p>
-            </div>
-            <Button variant="secondary" asChild>
-              <Link href={`/study/${sessions[0].id}/read`}>
-                Resume last session
-                <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : null}
+      <section className="catalog-document-cards">
+        {documents.length === 0 ? (
+          <div className="catalog-empty-card"><BookOpenText /><h3>No source cards yet.</h3><p>Catalog a PDF to start the first study loop.</p></div>
+        ) : documents.slice(0, 3).map((document, index) => (
+          <article key={document.id} style={{ transform: `rotate(${index % 2 ? ".35" : "-.35"}deg)` }}>
+            <span className="catalog-subject-tab">PDF</span>
+            <header><span>{document.id.slice(0, 8).toUpperCase()}</span><span>{document.page_count} pp.</span></header>
+            <h3>{document.title}</h3>
+            <p>{document.extracted_text || document.original_filename}</p>
+            <footer>
+              <span>added {formatDistanceToNow(new Date(document.created_at), { addSuffix: true })}</span>
+              <Link href="/capture">Read →</Link>
+            </footer>
+          </article>
+        ))}
+      </section>
+
+      <section className="catalog-dashboard-bottom">
+        <DeskList title="Checkout log" icon={<CalendarClock />}>
+          {sessions.length === 0 ? <p className="catalog-list-empty">No sessions stamped yet.</p> : sessions.slice(0, 4).map((session) => (
+            <Link key={session.id} href={`/study/${session.id}/read`}>
+              <span><strong>{documentMap.get(session.document_id)?.title ?? "Study session"}</strong><small>sess. {session.id.slice(0, 8)}</small></span>
+              <em>{session.status.replaceAll("_", " ")}</em>
+            </Link>
+          ))}
+        </DeskList>
+        <DeskList title="Flashcard decks" icon={<PanelsTopLeft />}>
+          {decks.length === 0 ? <p className="catalog-list-empty">No decks punched yet.</p> : decks.slice(0, 4).map((deck) => (
+            <Link key={deck.sessionId} href={`/practice?sessionId=${deck.sessionId}`}>
+              <span><strong>{deck.documentTitle}</strong><small>{deck.cards.length} cards punched</small></span><em>Drill</em>
+            </Link>
+          ))}
+        </DeskList>
+        <DeskList title="Fresh notes" icon={<NotebookPen />}>
+          {notes.length === 0 ? <p className="catalog-list-empty">No notes filed yet.</p> : notes.slice(0, 4).map((note) => (
+            <Link key={note.id} href={`/notes/${note.id}`}>
+              <span><strong>{note.title}</strong><small>{note.summary}</small></span><em>Open</em>
+            </Link>
+          ))}
+        </DeskList>
+      </section>
     </div>
   );
+}
+
+function DeskList({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return <article className="catalog-desk-list"><header><h2>{title}</h2>{icon}</header><div>{children}</div></article>;
 }

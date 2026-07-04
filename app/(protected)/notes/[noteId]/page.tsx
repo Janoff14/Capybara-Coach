@@ -1,17 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CheckCircle2, Mic2, Sparkles } from "lucide-react";
+import { ArrowLeft, LoaderCircle, Mic2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/app/empty-state";
-import { NoteRichContent } from "@/components/app/note-rich-content";
-import { PageHeader } from "@/components/app/page-header";
 import { useAuth } from "@/components/providers/auth-provider";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { formatNote } from "@/lib/note-format";
 
@@ -20,161 +16,63 @@ export default function NoteDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { token } = useAuth();
-
-  const noteQuery = useQuery({
-    queryKey: ["notes", params.noteId],
-    enabled: Boolean(token && params.noteId),
-    queryFn: () => api.getNote(params.noteId, token!),
-  });
-
+  const noteQuery = useQuery({ queryKey: ["notes", params.noteId], enabled: Boolean(token && params.noteId), queryFn: () => api.getNote(params.noteId, token!) });
   const note = noteQuery.data;
   const formattedNote = note ? formatNote(note) : null;
-  const isTypedCaptureNote = note?.note_json?.source_mode === "typed_capture";
 
   const startRecallMutation = useMutation({
     mutationFn: async () => {
-      if (!token) {
-        throw new Error("You need to be logged in to start note recall.");
-      }
+      if (!token) throw new Error("You need to be logged in to start note recall.");
       return api.createNoteRecallSession(token, params.noteId);
     },
     onSuccess: async (session) => {
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       router.push(`/study/${session.id}/record?autostart=1`);
     },
-    onError: (error) => {
-      toast.error(
-        error instanceof ApiError || error instanceof Error
-          ? error.message
-          : "Could not start note recall.",
-      );
-    },
+    onError: (error) => toast.error(error instanceof ApiError || error instanceof Error ? error.message : "Could not start note recall."),
   });
 
+  if (noteQuery.isLoading) return <div className="catalog-empty-card"><LoaderCircle className="reader-spin" /><h3>Pulling the folder…</h3></div>;
+  if (noteQuery.isError || !note || !formattedNote) return <div className="catalog-empty-card"><h3>This note could not be loaded.</h3><Link href="/notes">Back to notes</Link></div>;
+
   return (
-    <div className="space-y-8">
-      <PageHeader
-        eyebrow="Note detail"
-        title={note?.title ?? "Loading note"}
-        description={
-          isTypedCaptureNote
-            ? "Review the note organized from your own reading capture."
-            : "Review the cleaned summary and final note body generated from your assessed explanation."
-        }
-        actions={
-          note ? (
-            <Button
-              onClick={() => startRecallMutation.mutate()}
-              disabled={startRecallMutation.isPending}
-            >
-              <Mic2 className="size-4" />
-              {startRecallMutation.isPending ? "Opening recorder..." : "Retell this note"}
-            </Button>
-          ) : null
-        }
-      />
+    <div className="catalog-note-detail">
+      <div className="catalog-note-detail-nav">
+        <Link href="/notes"><ArrowLeft /> Filed folders</Link>
+        <button type="button" onClick={() => startRecallMutation.mutate()} disabled={startRecallMutation.isPending}>
+          <Mic2 /> {startRecallMutation.isPending ? "Opening recorder…" : "Recall again"}
+        </button>
+      </div>
 
-      {noteQuery.isLoading ? (
-        <Card>
-          <CardContent className="py-8 text-sm text-[var(--muted-foreground)]">
-            Loading note detail...
-          </CardContent>
-        </Card>
-      ) : noteQuery.isError || !note ? (
-        <EmptyState
-          title="This note could not be loaded"
-          description="It may have been removed, or the backend request may have failed."
-        />
-      ) : (
-        <div className="surface-grid xl:grid-cols-[0.88fr_1.42fr] xl:grid">
-          <div className="space-y-6">
-            <Card className="overflow-hidden">
-              <div className="h-1.5 bg-[linear-gradient(90deg,var(--primary),var(--primary-soft),var(--accent-warm))]" />
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-                <CardDescription>
-                  Saved on {format(new Date(note.created_at), "PPP 'at' p")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-[15px] leading-8 text-[var(--muted-foreground)]">
-                  {note.summary}
-                </p>
-              </CardContent>
-            </Card>
+      <article className="catalog-note-paper">
+        <i className="catalog-note-rule" />
+        <header>
+          <div><p className="reader-overline">NOTE · {note.id.slice(0, 8).toUpperCase()} · filed {format(new Date(note.created_at), "PPP")}</p><h1>{note.title}</h1></div>
+          <span>Filed clean</span>
+        </header>
+        <div className="catalog-note-paper-body">
+          <p className="catalog-note-summary">{note.summary}</p>
 
-            {formattedNote && formattedNote.takeaways.length > 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>At a Glance</CardTitle>
-                  <CardDescription>
-                    The fastest way to skim the important ideas before you dive into the full note.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {formattedNote.takeaways.map((item) => (
-                      <li
-                        key={item}
-                        className="flex items-start gap-3 rounded-[16px] border border-[rgba(194,200,190,0.35)] bg-[rgba(133,165,121,0.08)] px-4 py-3 text-sm leading-7 text-[var(--muted-foreground)]"
-                      >
-                        <CheckCircle2 className="mt-1 size-4 shrink-0 text-[var(--primary)]" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ) : null}
+          {formattedNote.takeaways.length ? <>
+            <h2>Key points</h2>
+            <ul className="catalog-note-points">{formattedNote.takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
+          </> : null}
 
-            {formattedNote && formattedNote.reviewQuestions.length > 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Review Prompts</CardTitle>
-                  <CardDescription>
-                    Use these to test recall instead of rereading passively.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {formattedNote.reviewQuestions.map((question, index) => (
-                    <div
-                      key={question}
-                      className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4"
-                    >
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
-                        Prompt {index + 1}
-                      </p>
-                      <p className="mt-2 text-sm leading-7 text-[var(--muted-foreground)]">
-                        {question}
-                      </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ) : null}
-          </div>
+          {formattedNote.sections.map((section) => (
+            <section key={section.id} className="catalog-note-section">
+              <h2>{section.title}</h2>
+              {section.paragraphs.map((paragraph) => <p key={`${section.id}-${paragraph.slice(0, 24)}`}>{paragraph}</p>)}
+              {section.bullets.length ? <ul>{section.bullets.map((bullet) => <li key={`${section.id}-${bullet.slice(0, 24)}`}>{bullet}</li>)}</ul> : null}
+            </section>
+          ))}
 
-          <Card className="overflow-hidden">
-            <div className="h-1.5 bg-[linear-gradient(90deg,rgba(245,212,140,0.75),rgba(133,165,121,0.45),rgba(73,102,64,0.75))]" />
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-[rgba(73,102,64,0.12)] p-2 text-[var(--primary)]">
-                  <Sparkles className="size-4" />
-                </div>
-                <div>
-                  <CardTitle>Full Note</CardTitle>
-                  <CardDescription>
-                    Reformatted for scanning, review, and easier studying.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <NoteRichContent note={note} />
-            </CardContent>
-          </Card>
+          {formattedNote.blocks.map((block) => block.type === "list"
+            ? <ul key={block.id} className="catalog-note-points">{block.items.map((item) => <li key={`${block.id}-${item.slice(0, 24)}`}>{item}</li>)}</ul>
+            : <p key={block.id}>{block.text}</p>)}
+
+          {formattedNote.reviewQuestions.length ? <div className="catalog-review-prompts"><h2>Review prompts</h2>{formattedNote.reviewQuestions.map((question, index) => <p key={question}><strong>{index + 1}.</strong> {question}</p>)}</div> : null}
         </div>
-      )}
+      </article>
     </div>
   );
 }

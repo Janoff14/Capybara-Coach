@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
+import {
+  Libre_Caslon_Text,
+  Manrope,
+  Plus_Jakarta_Sans,
+  Special_Elite,
+} from "next/font/google";
 
 import { AppProviders } from "@/app/providers";
 import "@/app/globals.css";
@@ -12,6 +17,19 @@ const manrope = Manrope({
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-headline",
   subsets: ["latin"],
+});
+
+const libreCaslonText = Libre_Caslon_Text({
+  variable: "--font-reader-serif",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+});
+
+const specialElite = Special_Elite({
+  variable: "--font-reader-typewriter",
+  subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +45,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${plusJakartaSans.variable} min-h-full scroll-smooth`}
+      className={`${manrope.variable} ${plusJakartaSans.variable} ${libreCaslonText.variable} ${specialElite.variable} min-h-full scroll-smooth`}
     >
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">
         <AppProviders>{children}</AppProviders>

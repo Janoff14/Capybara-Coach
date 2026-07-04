@@ -304,7 +304,7 @@ export default function AssessmentPage() {
   const hasStrictnessChanged = strictness !== appliedStrictness;
 
   return (
-    <div className="space-y-8">
+    <div className="catalog-study-page catalog-assessment-page space-y-8">
       <PageHeader
         eyebrow="Assessment"
         title={sourceNote?.title ?? document?.title ?? "Assessment results"}
