@@ -1,23 +1,75 @@
-import { Spinner } from "@/components/ui/spinner";
-
 export function LoadingScreen({
   message = "Loading your study workspace...",
 }: {
   message?: string;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="editorial-panel flex w-full max-w-md flex-col items-center gap-4 rounded-[28px] border border-[var(--border-soft)] px-8 py-10 text-center">
-        <Spinner className="size-8 text-[var(--primary)]" />
+    <div
+      className="reader-catalog reader-loading-screen"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      aria-busy="true"
+    >
+      <header className="reader-loading-masthead" aria-hidden="true">
         <div>
-          <p className="font-display text-2xl font-bold tracking-[-0.04em] text-[var(--foreground)]">
-            {message}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-            Hang tight while we sync your current session.
-          </p>
+          <strong>Capybara Coach</strong>
+          <span>Reading room · circulation desk</span>
         </div>
-      </div>
+        <p>
+          <i /> Desk open
+        </p>
+      </header>
+
+      <main className="reader-loading-desk">
+        <div className="reader-loading-wrap">
+          <div className="reader-auth-capy reader-loading-capy" aria-hidden="true">
+            <i />
+            <i />
+            <span>
+              <b />
+              <b />
+              <em />
+            </span>
+          </div>
+
+          <section className="reader-loading-card">
+            <div className="reader-loading-tab" aria-hidden="true">
+              Request pending
+            </div>
+            <header aria-hidden="true">
+              <span>Reading room request</span>
+              <span>Form 42-L</span>
+            </header>
+
+            <div className="reader-loading-card-body">
+              <div className="reader-loading-stamp" aria-hidden="true">
+                Processing
+              </div>
+              <p className="reader-overline" aria-hidden="true">
+                Circulation desk · please wait
+              </p>
+              <h1>{message}</h1>
+              <p className="reader-loading-copy">
+                Your place is marked. We&apos;re pulling the right cards from the drawer.
+              </p>
+
+              <div className="reader-loading-progress" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
+
+            <footer aria-hidden="true">
+              <span>Read · recall · assess · file · drill</span>
+              <span>Filed automatically</span>
+            </footer>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
