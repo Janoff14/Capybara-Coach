@@ -6,9 +6,6 @@ export function LoadingScreen({
   return (
     <div
       className="reader-catalog reader-loading-screen"
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
       aria-busy="true"
     >
       <header className="reader-loading-masthead" aria-hidden="true">
@@ -21,7 +18,7 @@ export function LoadingScreen({
         </p>
       </header>
 
-      <main className="reader-loading-desk">
+      <div className="reader-loading-desk">
         <div className="reader-loading-wrap">
           <div className="reader-auth-capy reader-loading-capy" aria-hidden="true">
             <i />
@@ -49,7 +46,14 @@ export function LoadingScreen({
               <p className="reader-overline" aria-hidden="true">
                 Circulation desk · please wait
               </p>
-              <h1>{message}</h1>
+              <p
+                className="reader-loading-message"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {message}
+              </p>
               <p className="reader-loading-copy">
                 Your place is marked. We&apos;re pulling the right cards from the drawer.
               </p>
@@ -69,7 +73,7 @@ export function LoadingScreen({
             </footer>
           </section>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
