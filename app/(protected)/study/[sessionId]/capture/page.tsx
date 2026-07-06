@@ -197,11 +197,13 @@ export default function StudyCapturePage() {
     toast.success(`Page ${pageToSave} marked. Syncing in the background.`);
 
     const saveOperation = markerQueueRef.current.then(async () => {
-      const updatedDocument = await api.saveDocumentProgress(token, documentId, pageToSave);
-      queryClient.setQueryData(["documents", documentId], updatedDocument);
+      const progress = await api.saveDocumentProgress(token, documentId, pageToSave);
+      queryClient.setQueryData<DocumentRead>(["documents", documentId], (document) =>
+        document ? { ...document, ...progress } : document,
+      );
       queryClient.setQueryData<DocumentRead[]>(["documents"], (documents) =>
         documents?.map((document) =>
-          document.id === documentId ? updatedDocument : document,
+          document.id === documentId ? { ...document, ...progress } : document,
         ),
       );
       void queryClient.invalidateQueries({ queryKey: ["documents"] });

@@ -283,7 +283,7 @@ function ReaderSurface({
             The original PDF could not be loaded for this document.
           </div>
         ) : (
-          <div className={isFullscreen ? "grid h-full lg:grid-cols-[minmax(0,1fr)_23rem]" : "grid min-h-[74vh] lg:grid-cols-[minmax(0,1fr)_23rem]"}>
+          <div className={isFullscreen ? "grid h-full lg:grid-cols-[minmax(0,1fr)_23rem]" : "grid h-[74vh] lg:grid-cols-[minmax(0,1fr)_23rem]"}>
             <div ref={viewerRef} className="overflow-y-auto bg-[linear-gradient(180deg,rgba(248,245,238,0.98),rgba(242,238,228,0.95))]">
               <div className="mx-auto flex max-w-[960px] flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
                 <div className="rounded-[22px] border border-[var(--border-soft)] bg-[var(--panel)] px-5 py-4 shadow-[var(--shadow-soft)]">
@@ -406,9 +406,9 @@ function ReaderSurface({
                               ) : null}
                               {section.summaryBullets.length > 0 ? (
                                 <ul className="mt-4 space-y-2">
-                                  {section.summaryBullets.map((item) => (
+                                  {section.summaryBullets.map((item, itemIndex) => (
                                     <li
-                                      key={`${section.id}-summary-${item.slice(0, 32)}`}
+                                      key={`${section.id}-summary-${itemIndex}`}
                                       className="flex items-start gap-3 text-sm leading-7 text-[var(--muted-foreground)]"
                                     >
                                       <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]" />
@@ -430,9 +430,9 @@ function ReaderSurface({
                         title="Key terms"
                       >
                         <div className="space-y-3">
-                          {keyTerms.map((item) => (
+                          {keyTerms.map((item, itemIndex) => (
                             <div
-                              key={item.term}
+                              key={`${item.term}-${itemIndex}`}
                               className="rounded-[18px] border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4"
                             >
                               <p className="font-display text-lg font-bold tracking-[-0.04em] text-[var(--foreground)]">

@@ -7,6 +7,12 @@ class DocumentProgressUpdate(BaseModel):
     page: int = Field(ge=1)
 
 
+class DocumentProgressRead(BaseModel):
+    last_read_page: int
+    progress_percent: int
+    updated_at: datetime
+
+
 class DocumentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

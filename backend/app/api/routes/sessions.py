@@ -133,12 +133,9 @@ def _typed_capture_groups(
 
 
 def _clear_generated_outputs(db: Session, study_session: StudySession) -> None:
-    for card in list(study_session.flashcards):
-        db.delete(card)
-    if study_session.review_schedule is not None:
-        db.delete(study_session.review_schedule)
-    if study_session.note is not None:
-        db.delete(study_session.note)
+    study_session.flashcards.clear()
+    study_session.review_schedule = None
+    study_session.note = None
 
     study_session.assessment_score = None
     study_session.assessment_feedback = None
@@ -294,11 +291,9 @@ def create_typed_results(
     )
     note_payload = result["note"]
     cards_payload = result["cards"] if study_material else []
+    review_schedule = study_session.review_schedule
 
-    for card in list(study_session.flashcards):
-        db.delete(card)
-    if study_session.review_schedule is not None:
-        db.delete(study_session.review_schedule)
+    study_session.flashcards.clear()
 
     note = study_session.note
     if note is None:
@@ -321,7 +316,7 @@ def create_typed_results(
     db.flush()
 
     for index, payload in enumerate(cards_payload):
-        db.add(
+        study_session.flashcards.append(
             Flashcard(
                 user_id=study_session.user_id,
                 study_session_id=study_session.id,
@@ -337,16 +332,22 @@ def create_typed_results(
         )
 
     if cards_payload:
-        db.add(
-            ReviewSchedule(
+        if review_schedule is None:
+            review_schedule = ReviewSchedule(
                 user_id=study_session.user_id,
                 study_session_id=study_session.id,
-                interval_index=0,
-                current_interval_days=1,
-                completed_reviews=0,
-                next_review_at=utcnow(),
             )
-        )
+        review_schedule.interval_index = 0
+        review_schedule.current_interval_days = 1
+        review_schedule.completed_reviews = 0
+        review_schedule.last_rating = None
+        review_schedule.last_reviewed_at = None
+        review_schedule.next_review_at = utcnow()
+        study_session.review_schedule = review_schedule
+        db.add(review_schedule)
+    elif review_schedule is not None:
+        study_session.review_schedule = None
+        db.delete(review_schedule)
 
     study_session.assessment_score = None
     study_session.assessment_feedback = None

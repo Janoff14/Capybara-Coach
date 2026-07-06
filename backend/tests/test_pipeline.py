@@ -674,6 +674,58 @@ class PipelineApiTests(unittest.TestCase):
             )
             self.assertEqual(len(typed_cards_response.json()), 1)
 
+            repeated_typed_results_response = self.client.post(
+                f"/sessions/{typed_session['id']}/typed-results",
+                headers=headers,
+            )
+            self.assertEqual(repeated_typed_results_response.status_code, 200)
+            self.assertEqual(
+                len(
+                    self.client.get(
+                        f"/flashcards?session_id={typed_session['id']}",
+                        headers=headers,
+                    ).json()
+                ),
+                1,
+            )
+            self.assertEqual(
+                len(
+                    [
+                        review
+                        for review in self.client.get("/reviews", headers=headers).json()
+                        if review["study_session_id"] == typed_session["id"]
+                    ]
+                ),
+                1,
+            )
+
+            changed_capture_response = self.client.put(
+                f"/sessions/{typed_session['id']}/typed-capture",
+                headers=headers,
+                json={
+                    "chunks": [
+                        {
+                            **typed_chunks[0],
+                            "content": "A changed explanation should invalidate generated results.",
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(changed_capture_response.status_code, 200)
+            self.assertEqual(
+                self.client.get(
+                    f"/flashcards?session_id={typed_session['id']}",
+                    headers=headers,
+                ).json(),
+                [],
+            )
+            self.assertFalse(
+                any(
+                    review["study_session_id"] == typed_session["id"]
+                    for review in self.client.get("/reviews", headers=headers).json()
+                )
+            )
+
             note_only_session = self.client.post(
                 "/sessions",
                 headers=headers,

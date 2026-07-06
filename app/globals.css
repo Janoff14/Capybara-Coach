@@ -1084,9 +1084,12 @@ textarea {
   .reader-catalog-brand { font-size: 17px; }
   .reader-catalog-lamp { width: 70px; transform: scale(.82); }
   .reader-catalog-logout { width: 32px; }
-  .reader-catalog-tabs { gap: 5px; }
-  .reader-catalog-tab { min-width: 96px; padding-inline: 6px; }
+  .reader-catalog-nav-row { overflow-x: visible; }
+  .reader-catalog-tabs { display: grid; width: 100%; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: stretch; gap: 5px; padding-right: 0; }
+  .reader-catalog-tab { min-width: 0; padding: 7px 6px 5px; border-bottom: 2px solid var(--rd-wood-2); border-radius: 7px; }
+  .reader-catalog-tab.is-active { padding-top: 7px; transform: none; }
   .reader-catalog-tab span { padding-inline: 7px; font-size: 8.5px; }
+  .reader-catalog-tab i { margin-top: 5px; }
   .reader-library { padding: 20px 16px 60px; }
   .reader-catalog-content { padding: 22px 16px 80px; }
   .reader-upload-header { padding: 19px 48px 17px 20px; }

@@ -10,7 +10,7 @@ from app.core.database import get_db
 from app.models.document import Document
 from app.models.document_progress import DocumentProgress
 from app.models.user import User
-from app.schemas.document import DocumentProgressUpdate, DocumentRead
+from app.schemas.document import DocumentProgressRead, DocumentProgressUpdate, DocumentRead
 from app.services.ai import generate_reader_guide
 from app.services.auth import get_current_user
 from app.services.pdf import extract_text_from_payload
@@ -84,13 +84,13 @@ def get_document_file(
     )
 
 
-@router.put("/{document_id}/progress", response_model=DocumentRead)
+@router.put("/{document_id}/progress", response_model=DocumentProgressRead)
 def update_document_progress(
     document_id: str,
     payload: DocumentProgressUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Document:
+) -> DocumentProgressRead:
     document = _get_document_or_404(db, document_id, current_user.id)
     upper_bound = max(1, document.page_count)
     page = min(payload.page, upper_bound)
@@ -108,7 +108,12 @@ def update_document_progress(
 
     db.add(progress)
     db.commit()
-    return _get_document_or_404(db, document_id, current_user.id)
+    db.refresh(progress)
+    return DocumentProgressRead(
+        last_read_page=page,
+        progress_percent=min(100, round((page / upper_bound) * 100)),
+        updated_at=progress.updated_at,
+    )
 
 
 @router.post("/upload", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)

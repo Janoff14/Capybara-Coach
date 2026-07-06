@@ -2,14 +2,20 @@ from io import BytesIO
 from pathlib import Path
 
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 
 def extract_text_from_payload(filename: str, payload: bytes) -> tuple[str, str, int]:
     suffix = Path(filename).suffix.lower()
     if suffix == ".pdf":
-        reader = PdfReader(BytesIO(payload))
-        page_count = len(reader.pages)
-        extracted_pages = [(page.extract_text() or "").strip() for page in reader.pages]
+        try:
+            reader = PdfReader(BytesIO(payload))
+            page_count = len(reader.pages)
+            extracted_pages = [(page.extract_text() or "").strip() for page in reader.pages]
+        except (PdfReadError, OSError, ValueError) as exc:
+            raise ValueError(
+                "The PDF could not be read. Check that it is a valid, unencrypted PDF."
+            ) from exc
         text = "\n\n".join(page for page in extracted_pages if page)
         if not text.strip():
             raise ValueError("The PDF did not contain readable text.")

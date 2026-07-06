@@ -29,6 +29,11 @@ export type DocumentRead = {
   updated_at: string;
 };
 
+export type DocumentProgressRead = Pick<
+  DocumentRead,
+  "last_read_page" | "progress_percent" | "updated_at"
+>;
+
 export type ReaderHighlightType = "key_idea" | "definition" | "example";
 
 export type ReaderHighlight = {

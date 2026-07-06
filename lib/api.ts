@@ -1,6 +1,7 @@
 import type {
   AuthUser,
   DocumentRead,
+  DocumentProgressRead,
   FlashcardRead,
   LoginInput,
   NoteRead,
@@ -315,7 +316,7 @@ export const api = {
   },
 
   saveDocumentProgress(token: string, documentId: string, page: number) {
-    return request<DocumentRead>(`/documents/${documentId}/progress`, {
+    return request<DocumentProgressRead>(`/documents/${documentId}/progress`, {
       method: "PUT",
       token,
       json: { page },
