@@ -6,7 +6,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "editorial-panel rounded-[24px] border border-[var(--border-soft)] bg-[rgba(255,255,255,0.88)]",
+        "editorial-panel rounded-[24px] border border-[var(--border-soft)] bg-[var(--panel)]",
         className,
       )}
       {...props}

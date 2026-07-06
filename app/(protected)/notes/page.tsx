@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowRight, FileText, LoaderCircle } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 
+import { OperationProgress } from "@/components/app/operation-progress";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api } from "@/lib/api";
 
@@ -25,7 +26,7 @@ export default function NotesPage() {
 
       {notesQuery.isError ? <div className="catalog-notice is-error">The notes drawer could not be loaded.</div> : null}
       {notesQuery.isLoading ? (
-        <div className="catalog-empty-card"><LoaderCircle className="reader-spin" /><h3>Checking filed folders…</h3></div>
+        <div className="catalog-empty-card"><OperationProgress label="Checking filed folders" detail="Loading your generated study notes." /></div>
       ) : notes.length === 0 ? (
         <div className="catalog-empty-card"><FileText /><h3>No notes filed yet.</h3><p>Finish a recall or reading session to create the first clean note.</p><Link href="/documents">Go to documents →</Link></div>
       ) : (

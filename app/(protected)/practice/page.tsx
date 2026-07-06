@@ -37,7 +37,10 @@ export default function PracticePage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const sessionIdParam = searchParams.get("sessionId");
-  const [selectedSessionIdOverride, setSelectedSessionIdOverride] = useState<string | null>(null);
+  const [selectedSessionOverride, setSelectedSessionOverride] = useState<{
+    routeSessionId: string | null;
+    selectedSessionId: string;
+  } | null>(null);
   const flashcardsQuery = useQuery({
     queryKey: ["flashcards"],
     enabled: Boolean(token),
@@ -76,7 +79,9 @@ export default function PracticePage() {
     () => new Map((reviewsQuery.data ?? []).map((review) => [review.study_session_id, review])),
     [reviewsQuery.data],
   );
-  const selectedSessionId = sessionIdParam ?? selectedSessionIdOverride ?? decks[0]?.sessionId ?? null;
+  const selectedSessionId = selectedSessionOverride?.routeSessionId === sessionIdParam
+    ? selectedSessionOverride.selectedSessionId
+    : sessionIdParam ?? decks[0]?.sessionId ?? null;
   const selectedDeck = decks.find((deck) => deck.sessionId === selectedSessionId) ?? decks[0] ?? null;
   const requestedDeckExists = Boolean(
     sessionIdParam && decks.some((deck) => deck.sessionId === sessionIdParam),
@@ -96,7 +101,7 @@ export default function PracticePage() {
               key={deck.sessionId}
               type="button"
               className={deck.sessionId === selectedDeck?.sessionId ? "is-active" : ""}
-              onClick={() => setSelectedSessionIdOverride(deck.sessionId)}
+              onClick={() => setSelectedSessionOverride({ routeSessionId: sessionIdParam, selectedSessionId: deck.sessionId })}
             >
               {deck.documentTitle} ({deck.cards.length})
             </button>
@@ -126,12 +131,15 @@ export default function PracticePage() {
         />
       ) : null}
 
+      {flashcardsQuery.isError || reviewsQuery.isError || sessionQuery.isError ? (
+        <div className="catalog-notice is-error">The practice drawer could not be fully loaded. Check the study service and try again.</div>
+      ) : null}
+
       {flashcardsQuery.isLoading ? (
         <div className="catalog-empty-card">
-          <LoaderCircle className="reader-spin" />
-          <h3>Shuffling the decks…</h3>
+          <OperationProgress label="Shuffling the decks" detail="Loading flashcards and their review schedules." />
         </div>
-      ) : decks.length === 0 ? (
+      ) : flashcardsQuery.isError ? null : decks.length === 0 ? (
         <div className="catalog-empty-card">
           <Layers3 />
           <h3>No flashcards punched yet.</h3>

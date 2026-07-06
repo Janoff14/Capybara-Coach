@@ -22,7 +22,10 @@ def _create_client(settings: Settings) -> Client:
             "Supabase storage is not configured. Set SUPABASE_URL and SUPABASE_KEY "
             "or SUPABASE_SERVICE_ROLE_KEY."
         )
-    return create_client(settings.supabase_url, settings.supabase_key)
+    try:
+        return create_client(settings.supabase_url, settings.supabase_key)
+    except Exception as exc:
+        raise RuntimeError("The configured storage service could not be initialized.") from exc
 
 
 def _filesystem_object_path(
@@ -62,7 +65,10 @@ def upload_bytes(
     options = {"upsert": "false"}
     if content_type:
         options["content-type"] = content_type
-    client.storage.from_(bucket).upload(object_path, payload, options)
+    try:
+        client.storage.from_(bucket).upload(object_path, payload, options)
+    except Exception as exc:
+        raise RuntimeError("The file could not be uploaded to the configured storage service.") from exc
     return object_path
 
 
@@ -79,7 +85,10 @@ def download_bytes(*, settings: Settings, bucket: str, object_path: str) -> byte
             raise RuntimeError("Stored file was not found.") from exc
 
     client = _create_client(settings)
-    payload = client.storage.from_(bucket).download(object_path)
+    try:
+        payload = client.storage.from_(bucket).download(object_path)
+    except Exception as exc:
+        raise RuntimeError("The file could not be downloaded from the configured storage service.") from exc
     if isinstance(payload, bytes):
         return payload
     raise RuntimeError("Supabase download did not return file bytes.")
@@ -96,4 +105,7 @@ def remove_object(*, settings: Settings, bucket: str, object_path: str) -> None:
         return
 
     client = _create_client(settings)
-    client.storage.from_(bucket).remove([object_path])
+    try:
+        client.storage.from_(bucket).remove([object_path])
+    except Exception as exc:
+        raise RuntimeError("The file could not be removed from the configured storage service.") from exc

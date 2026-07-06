@@ -10,6 +10,7 @@ import { LockKeyhole, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 
 import { AuthShell } from "@/components/app/auth-shell";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,6 +138,10 @@ export default function RegisterPage() {
         >
           {registerMutation.isPending ? "Creating account..." : "Create account"}
         </Button>
+
+        {registerMutation.isPending ? (
+          <OperationProgress compact label="Creating your account" detail="Setting up your private study workspace." />
+        ) : null}
 
         <p className="text-center text-sm text-[var(--foreground-soft)]">
           Already have an account?{" "}

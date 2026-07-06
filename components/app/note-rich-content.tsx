@@ -9,7 +9,7 @@ export function NoteRichContent({ note }: { note: NoteRead }) {
       {formatted.sections.map((section) => (
         <article
           key={section.id}
-          className="rounded-[20px] border border-[rgba(194,200,190,0.38)] bg-[linear-gradient(180deg,rgba(133,165,121,0.08),rgba(255,255,255,0.96))] p-6"
+          className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--panel)] p-6"
         >
           <div className="flex items-start gap-4">
             {section.index ? (
@@ -72,7 +72,7 @@ export function NoteRichContent({ note }: { note: NoteRead }) {
         return (
           <div
             key={block.id}
-            className="rounded-[20px] border border-[var(--border-soft)] bg-white p-6 text-[15px] leading-8 text-[var(--muted-foreground)] shadow-[0_8px_24px_rgba(28,27,27,0.04)]"
+            className="rounded-[20px] border border-[var(--border-soft)] bg-[var(--panel)] p-6 text-[15px] leading-8 text-[var(--muted-foreground)] shadow-[var(--shadow-soft)]"
           >
             {block.text}
           </div>

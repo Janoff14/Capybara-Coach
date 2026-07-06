@@ -10,6 +10,7 @@ import { LockKeyhole, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 import { AuthShell } from "@/components/app/auth-shell";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,6 +136,10 @@ export default function LoginPage() {
           >
             {getLoginErrorMessage(loginMutation.error)}
           </p>
+        ) : null}
+
+        {loginMutation.isPending ? (
+          <OperationProgress compact label="Signing you in" detail="Checking your account and restoring the study workspace." />
         ) : null}
 
         <Button className="w-full" size="lg" type="submit" disabled={loginMutation.isPending}>

@@ -80,6 +80,11 @@ export default function StudyReadPage() {
     () => estimateReadingMinutes(document?.extracted_text ?? ""),
     [document?.extracted_text],
   );
+  const loadError = sessionQuery.isError || documentQuery.isError
+    ? "The study session or its document could not be loaded."
+    : documentFileQuery.isError
+      ? "The original PDF could not be loaded from the backend."
+      : null;
 
   return (
     <div className="catalog-study-page space-y-8">
@@ -122,7 +127,7 @@ export default function StudyReadPage() {
 
       <DocumentReader
         blob={documentFileQuery.data ?? null}
-        error={documentFileQuery.isError ? "The original PDF could not be loaded from the backend." : null}
+        error={loadError}
         importantSentences={readerGuide.importantSentences}
         isLoading={sessionQuery.isLoading || documentQuery.isLoading || documentFileQuery.isLoading}
         keyTerms={readerGuide.keyTerms}

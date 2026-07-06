@@ -338,12 +338,17 @@ export default function AssessmentPage() {
         <OperationProgress label={activeOperation.label} detail={activeOperation.detail} />
       ) : null}
 
-      {sessionQuery.isLoading ? (
-        <Card>
-          <CardContent className="py-8 text-sm text-[var(--muted-foreground)]">
-            Loading the assessed session...
-          </CardContent>
-        </Card>
+      {sessionQuery.isLoading || documentQuery.isLoading || sourceNoteQuery.isLoading || flashcardsQuery.isLoading ? (
+        <OperationProgress
+          label="Loading the assessment"
+          detail="Gathering the session, source context, feedback, and generated study material."
+        />
+      ) : sessionQuery.isError || documentQuery.isError || sourceNoteQuery.isError || flashcardsQuery.isError ? (
+        <EmptyState
+          title="Assessment could not be loaded"
+          description="One of the session resources is unavailable. Return to recording and try again."
+          action={<Button onClick={() => router.push(`/study/${params.sessionId}/record`)}>Back to recording</Button>}
+        />
       ) : !session || !assessment || !criteria ? (
         <EmptyState
           title="Assessment is not ready yet"
@@ -359,7 +364,7 @@ export default function AssessmentPage() {
           <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr_0.8fr]">
             <Card className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="border-b border-[var(--border-soft)] bg-[linear-gradient(135deg,rgba(73,102,64,0.12),rgba(255,255,255,0.3))] px-6 py-5">
+                <div className="border-b border-[var(--border-soft)] bg-[var(--panel-soft)] px-6 py-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--primary)]">
                     Overall score
                   </p>
@@ -372,7 +377,7 @@ export default function AssessmentPage() {
                         {getScoreMood(assessment.score)}
                       </p>
                     </div>
-                    <div className="rounded-full border border-[var(--border-soft)] bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                    <div className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                       Strictness {appliedStrictness}
                     </div>
                   </div>
@@ -421,7 +426,7 @@ export default function AssessmentPage() {
                         {strictnessProfile.label}
                       </p>
                     </div>
-                    <div className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-2 text-sm font-semibold text-[var(--foreground)]">
+                    <div className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]">
                       {strictness}
                     </div>
                   </div>

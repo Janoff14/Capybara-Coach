@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OperationProgress } from "@/components/app/operation-progress";
 
 export function PdfViewer({
   blob,
@@ -41,8 +42,8 @@ export function PdfViewer({
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-dashed border-[rgba(194,200,190,0.5)] bg-[var(--panel-soft)] text-[var(--muted-foreground)]">
-            Preparing your PDF preview...
+          <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-dashed border-[var(--border-soft)] bg-[var(--panel-soft)] p-6 text-[var(--muted-foreground)]">
+            <OperationProgress label="Preparing your PDF preview" detail="Downloading and opening the document." />
           </div>
         ) : error ? (
           <div className="flex h-[70vh] items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-500/10 px-6 text-center text-sm text-rose-100">

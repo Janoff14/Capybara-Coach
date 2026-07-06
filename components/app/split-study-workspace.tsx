@@ -29,7 +29,10 @@ import type { TypedCaptureChunk, TypedChunkCategory } from "@/lib/types";
 import { LazyPdfPage } from "@/components/app/lazy-pdf-page";
 import { OperationProgress } from "@/components/app/operation-progress";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 const PDF_OPTIONS = {
   cMapPacked: true,
@@ -303,7 +306,7 @@ export function SplitStudyWorkspace({
 
         <div ref={viewerRef} className="reader-pdf-scroll" aria-label="Scrollable textbook pages">
           {isLoading ? (
-            <ReaderMessage>Preparing the textbook…</ReaderMessage>
+            <ReaderMessage><OperationProgress label="Preparing the textbook" detail="Downloading and rendering the first visible page." /></ReaderMessage>
           ) : error ? (
             <ReaderMessage tone="error">{error}</ReaderMessage>
           ) : !blobUrl ? (

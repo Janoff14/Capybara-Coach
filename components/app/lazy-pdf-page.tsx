@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { startTransition, type RefObject, useEffect, useRef, useState } from "react";
 import { Page } from "react-pdf";
 
 type LazyPdfPageProps = {
@@ -35,7 +35,7 @@ export function LazyPdfPage({
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldRender(true);
+          startTransition(() => setShouldRender(true));
           observer.disconnect();
         }
       },

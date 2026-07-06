@@ -8,6 +8,7 @@ import { BookOpenText, LoaderCircle, Mic2, NotebookPen } from "lucide-react";
 import { toast } from "sonner";
 
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, ApiError } from "@/lib/api";
 import { sessionDestination } from "@/lib/session-navigation";
@@ -26,6 +27,8 @@ export default function DocumentsPage() {
   const sessionsQuery = useQuery({ queryKey: ["sessions"], enabled: Boolean(token), queryFn: () => api.getSessions(token!) });
   const documents = documentsQuery.data ?? [];
   const sessions = sessionsQuery.data ?? [];
+  const isLoading = documentsQuery.isLoading || sessionsQuery.isLoading;
+  const hasError = documentsQuery.isError || sessionsQuery.isError;
   const searchQuery = searchParams.get("q")?.trim() ?? "";
   const normalizedQuery = searchQuery.toLocaleLowerCase();
   const searchedDocuments = normalizedQuery
@@ -72,12 +75,18 @@ export default function DocumentsPage() {
         </div>
       </section>
 
-      {documentsQuery.isError ? <div className="catalog-notice is-error">The catalog drawer would not open. Check the API connection.</div> : null}
+      {hasError ? <div className="catalog-notice is-error">The catalog or checkout log would not open. Check the API connection.</div> : null}
+      {createSessionMutation.isPending ? (
+        <OperationProgress
+          label={pendingSessionKey?.endsWith(":capture") ? "Opening Read & note" : "Opening recall session"}
+          detail="Creating the session and preparing the selected document."
+        />
+      ) : null}
 
       <section className="catalog-library-grid">
         <UploadDocumentDialog buttonLabel="New acquisition" buttonClassName="catalog-new-acquisition" />
-        {documentsQuery.isLoading ? (
-          <div className="catalog-empty-card"><LoaderCircle className="reader-spin" /><h3>Reading the card index…</h3></div>
+        {isLoading ? (
+          <div className="catalog-empty-card"><OperationProgress label="Reading the card index" detail="Loading documents and their session history." /></div>
         ) : visibleDocuments.length === 0 ? (
           <div className="catalog-empty-card" role="status">
             <BookOpenText />

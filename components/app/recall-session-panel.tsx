@@ -20,7 +20,7 @@ export function RecallSessionPanel({
 }: RecallSessionPanelProps) {
   return (
     <div className="space-y-5">
-      <Card className="border-[rgba(73,102,64,0.16)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.82))]">
+      <Card className="border-[var(--border-soft)] bg-[var(--panel)]">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Brain className="size-4 text-[var(--primary)]" />

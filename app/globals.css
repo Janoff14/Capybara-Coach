@@ -497,7 +497,7 @@ textarea {
 .reader-page-progress i { display: block; height: 100%; background: var(--rd-green); transition: width .3s; }
 .reader-pdf-scroll { position: relative; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 26px 32px 55vh; scrollbar-color: var(--rd-line) transparent; }
 .reader-pdf-pages { display: flex; max-width: 940px; margin: 0 auto; flex-direction: column; gap: 25px; }
-.reader-pdf-page { position: relative; padding: 38px 34px 28px; border: 1px solid var(--rd-line); border-radius: 4px; background: var(--rd-paper); box-shadow: 0 10px 26px var(--rd-shadow); scroll-margin-top: 16px; }
+.reader-pdf-page { position: relative; padding: 38px 34px 28px; border: 1px solid var(--rd-line); border-radius: 4px; background: var(--rd-paper); box-shadow: 0 10px 26px var(--rd-shadow); scroll-margin-top: 16px; content-visibility: auto; contain: layout paint style; contain-intrinsic-size: auto 1100px; }
 .reader-page-ribbon { position: absolute; z-index: 2; top: -6px; right: 34px; width: 26px; height: 52px; background: var(--rd-stamp); box-shadow: 0 4px 8px var(--rd-shadow); clip-path: polygon(0 0,100% 0,100% 100%,50% 82%,0 100%); animation: reader-ribbon .4s ease both; }
 .reader-pdf-page-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; color: var(--rd-faint); font-family: var(--font-reader-typewriter), monospace; font-size: 9px; letter-spacing: .16em; text-transform: uppercase; }
 .reader-pdf-page-label strong { display: flex; align-items: center; gap: 5px; color: var(--rd-stamp); }
@@ -1234,6 +1234,9 @@ html[data-reader-theme="light"] .app-dialog-overlay { background: rgba(250,249,2
 .reader-catalog[data-theme="dark"] .reader-catalog-tab span { border-color: #64748b; background: #111827; color: #e2e8f0; }
 .reader-catalog[data-theme="dark"] .reader-catalog-tab.is-active span { color: #fda4af; }
 .reader-catalog[data-theme="dark"] .catalog-practice-paused { background: rgba(31,41,55,.96); }
+.reader-catalog[data-theme="dark"] .reader-compose-box { background: var(--rd-card-2); }
+.reader-catalog[data-theme="dark"] .reader-compose-box textarea { color: var(--rd-ink); color-scheme: dark; }
+.reader-catalog[data-theme="dark"] .reader-compose-box textarea::placeholder { color: var(--rd-faint); }
 .reader-catalog[data-theme="dark"] .catalog-due-card,
 .reader-catalog[data-theme="dark"] .reader-catalog-upload,
 .reader-catalog[data-theme="dark"] .reader-stamp-button,

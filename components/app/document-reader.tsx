@@ -20,10 +20,14 @@ import type { ReaderSection } from "@/lib/document-reader";
 import type { ReaderHighlightType, ReaderKeyTerm } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LazyPdfPage } from "@/components/app/lazy-pdf-page";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 const PDF_OPTIONS = {
   cMapPacked: true,
@@ -267,8 +271,8 @@ function ReaderSurface({
       </CardHeader>
       <CardContent className={isFullscreen ? "flex-1 overflow-hidden p-0" : "p-0"}>
         {isLoading ? (
-          <div className="flex h-[74vh] items-center justify-center bg-[var(--panel-soft)] text-[var(--muted-foreground)]">
-            Preparing your reading view...
+          <div className="flex h-[74vh] items-center justify-center bg-[var(--panel-soft)] p-6 text-[var(--muted-foreground)]">
+            <OperationProgress label="Preparing your reading view" detail="Downloading and rendering the document." />
           </div>
         ) : error ? (
           <div className="flex h-[74vh] items-center justify-center bg-rose-500/10 px-6 text-center text-sm text-rose-100">
@@ -282,7 +286,7 @@ function ReaderSurface({
           <div className={isFullscreen ? "grid h-full lg:grid-cols-[minmax(0,1fr)_23rem]" : "grid min-h-[74vh] lg:grid-cols-[minmax(0,1fr)_23rem]"}>
             <div ref={viewerRef} className="overflow-y-auto bg-[linear-gradient(180deg,rgba(248,245,238,0.98),rgba(242,238,228,0.95))]">
               <div className="mx-auto flex max-w-[960px] flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
-                <div className="rounded-[22px] border border-[var(--border-soft)] bg-[rgba(255,255,255,0.72)] px-5 py-4 shadow-[0_14px_35px_rgba(28,27,27,0.08)]">
+                <div className="rounded-[22px] border border-[var(--border-soft)] bg-[var(--panel)] px-5 py-4 shadow-[var(--shadow-soft)]">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--primary)]">
                     Reader mode
                   </p>
@@ -297,7 +301,7 @@ function ReaderSurface({
                 <Document
                   file={blobUrl}
                   loading={
-                    <div className="rounded-[24px] border border-[var(--border-soft)] bg-white px-6 py-10 text-center text-[var(--muted-foreground)] shadow-[0_18px_40px_rgba(28,27,27,0.08)]">
+                    <div className="rounded-[24px] border border-[var(--border-soft)] bg-[var(--panel)] px-6 py-10 text-center text-[var(--muted-foreground)] shadow-[var(--shadow-soft)]">
                       Rendering PDF pages...
                     </div>
                   }
@@ -317,7 +321,7 @@ function ReaderSurface({
                       key={`page-${index + 1}`}
                       data-reader-page={index + 1}
                       className={cn(
-                        "scroll-mt-4 rounded-[26px] border bg-white p-3 shadow-[0_18px_40px_rgba(28,27,27,0.08)]",
+                        "scroll-mt-4 rounded-[26px] border bg-[var(--panel)] p-3 shadow-[var(--shadow-soft)]",
                         initialPage === index + 1
                           ? "border-amber-400/70 ring-4 ring-amber-200/35"
                           : "border-[var(--border-soft)]",
@@ -350,7 +354,7 @@ function ReaderSurface({
 
             <aside className="overflow-y-auto border-t border-[var(--border-soft)] bg-[linear-gradient(180deg,rgba(250,248,242,0.92),rgba(243,239,229,0.94))] lg:border-l lg:border-t-0">
               <div className="space-y-4 px-4 py-5">
-                <Card className="border-[rgba(194,200,190,0.42)] bg-[rgba(255,255,255,0.72)]">
+                <Card className="border-[var(--border-soft)] bg-[var(--panel)]">
                   <CardHeader>
                     <CardTitle className="text-lg">Reading guide</CardTitle>
                     <CardDescription>
@@ -444,7 +448,7 @@ function ReaderSurface({
                     ) : null}
                   </>
                 ) : (
-                  <Card className="border-[var(--border-soft)] bg-[rgba(255,255,255,0.72)]">
+                  <Card className="border-[var(--border-soft)] bg-[var(--panel)]">
                     <CardContent className="px-5 py-5 text-sm leading-7 text-[var(--muted-foreground)]">
                       Guidance is hidden right now, so you can read the PDF without any coaching layer in the way.
                     </CardContent>
@@ -471,7 +475,7 @@ function GuideCard({
   title: string;
 }) {
   return (
-    <Card className="border-[rgba(194,200,190,0.42)] bg-[rgba(255,255,255,0.72)]">
+    <Card className="border-[var(--border-soft)] bg-[var(--panel)]">
       <CardHeader>
         <div className="flex items-center gap-2">
           {icon}

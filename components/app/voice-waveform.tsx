@@ -14,7 +14,7 @@ export function VoiceWaveform({
   const intensity = isRecording ? Math.max(0.14, Math.min(1, audioLevel * 24)) : 0.1;
 
   return (
-    <div className="flex h-28 items-end justify-center gap-2 rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(255,255,255,0.65),rgba(245,248,243,0.92))] px-5 py-5 shadow-[0_20px_40px_rgba(28,27,27,0.08)]">
+    <div className="flex h-28 items-end justify-center gap-2 rounded-[28px] border border-[var(--border-soft)] bg-[var(--panel-soft)] px-5 py-5 shadow-[var(--shadow-soft)]">
       {BAR_FACTORS.map((factor, index) => {
         const height = Math.max(
           14,

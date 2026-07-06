@@ -12,9 +12,9 @@ const buttonVariants = cva(
         default:
           "ink-gradient text-white shadow-[var(--shadow-button)] hover:-translate-y-0.5 hover:brightness-[1.02]",
         secondary:
-          "border border-[var(--border-soft)] bg-[rgba(255,255,255,0.92)] text-[var(--primary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[var(--panel-soft)] hover:text-[var(--primary-strong)]",
+          "border border-[var(--border-soft)] bg-[var(--panel)] text-[var(--primary)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-[var(--panel-soft)] hover:text-[var(--primary-strong)]",
         ghost:
-          "text-[var(--foreground-soft)] hover:bg-[rgba(75,102,72,0.06)] hover:text-[var(--primary)]",
+          "text-[var(--foreground-soft)] hover:bg-[var(--panel-soft)] hover:text-[var(--primary)]",
         destructive:
           "bg-[var(--danger)] text-white shadow-[0_10px_24px_rgba(167,59,33,0.18)] hover:-translate-y-0.5 hover:brightness-105",
       },

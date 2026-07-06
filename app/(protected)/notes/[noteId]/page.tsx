@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, LoaderCircle, Mic2 } from "lucide-react";
+import { ArrowLeft, Mic2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { api, ApiError } from "@/lib/api";
 import { formatNote } from "@/lib/note-format";
 
@@ -32,7 +33,7 @@ export default function NoteDetailPage() {
     onError: (error) => toast.error(error instanceof ApiError || error instanceof Error ? error.message : "Could not start note recall."),
   });
 
-  if (noteQuery.isLoading) return <div className="catalog-empty-card"><LoaderCircle className="reader-spin" /><h3>Pulling the folder…</h3></div>;
+  if (noteQuery.isLoading) return <div className="catalog-empty-card"><OperationProgress label="Pulling the folder" detail="Loading the note and its review prompts." /></div>;
   if (noteQuery.isError || !note || !formattedNote) return <div className="catalog-empty-card"><h3>This note could not be loaded.</h3><Link href="/notes">Back to notes</Link></div>;
 
   return (
@@ -43,6 +44,10 @@ export default function NoteDetailPage() {
           <Mic2 /> {startRecallMutation.isPending ? "Opening recorder…" : "Recall again"}
         </button>
       </div>
+
+      {startRecallMutation.isPending ? (
+        <OperationProgress label="Opening note recall" detail="Creating an assessment-only recall session from this note." />
+      ) : null}
 
       <article className="catalog-note-paper">
         <i className="catalog-note-rule" />

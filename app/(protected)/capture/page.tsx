@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, ApiError } from "@/lib/api";
 
@@ -102,6 +103,13 @@ export default function CaptureLibraryPage() {
           </p>
         </div>
 
+        {createSessionMutation.isPending ? (
+          <OperationProgress
+            label="Opening Read & note"
+            detail="Creating the session and preparing the document reader."
+          />
+        ) : null}
+
         {documentsQuery.isError || sessionsQuery.isError ? (
           <div className="reader-library-state is-error">
             <AlertTriangle aria-hidden="true" />
@@ -110,9 +118,7 @@ export default function CaptureLibraryPage() {
           </div>
         ) : documentsQuery.isLoading || sessionsQuery.isLoading ? (
           <div className="reader-library-state">
-            <LoaderCircle className="reader-spin" aria-hidden="true" />
-            <h3>Checking the shelves…</h3>
-            <p>Loading your textbooks and saved sessions.</p>
+            <OperationProgress label="Checking the shelves" detail="Loading your textbooks and saved sessions." />
           </div>
         ) : documents.length === 0 ? (
           <div className="reader-library-state">

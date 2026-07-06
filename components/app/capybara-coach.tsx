@@ -29,7 +29,7 @@ export function CapybaraCoach({
 }) {
   return (
     <div className="reader-coach pointer-events-none fixed bottom-5 right-5 z-40 flex max-w-[calc(100vw-2rem)] items-end gap-3 md:bottom-6 md:right-6">
-      <div className="reader-coach-message max-w-72 rounded-[24px] border border-[rgba(229,226,225,0.92)] bg-[rgba(255,255,255,0.92)] px-4 py-3 shadow-[0_18px_40px_rgba(28,27,27,0.12)] backdrop-blur-md">
+      <div className="reader-coach-message max-w-72 rounded-[24px] border border-[var(--border-soft)] bg-[var(--panel)] px-4 py-3 shadow-[var(--shadow-panel)]">
         <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
           <span>{STATE_LABELS[state]}</span>
           {promptType ? (

@@ -405,7 +405,17 @@ export default function StudyRecordPage() {
         }
       />
 
-      {!recorder.isSupported ? (
+      {sessionQuery.isLoading || documentQuery.isLoading || sourceNoteQuery.isLoading ? (
+        <OperationProgress
+          label="Preparing recall mode"
+          detail="Loading the session and its source context before enabling the recorder."
+        />
+      ) : sessionQuery.isError || documentQuery.isError || sourceNoteQuery.isError ? (
+        <EmptyState
+          title="Recall mode could not be prepared"
+          description="The session or its source material could not be loaded. Return to Documents and try opening it again."
+        />
+      ) : !recorder.isSupported ? (
         <EmptyState
           title="Recording is not supported in this browser"
           description="The MVP targets desktop Chromium. Open the app in Chrome or Edge to use the MediaRecorder flow."
@@ -421,7 +431,7 @@ export default function StudyRecordPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="recall-recorder-grid grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="recall-mic-panel rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.88))] p-5 shadow-[0_20px_40px_rgba(28,27,27,0.08)]">
+                <div className="recall-mic-panel rounded-[28px] border border-[var(--border-soft)] bg-[var(--panel-soft)] p-5 shadow-[var(--shadow-soft)]">
                   <div className="recall-mic-header flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
@@ -445,9 +455,9 @@ export default function StudyRecordPage() {
                         handleStartRecording();
                       }}
                       disabled={submitMutation.isPending}
-                      className="recall-quick-mic group flex flex-col items-center gap-2 rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-white px-4 py-3 text-center shadow-[0_16px_34px_rgba(28,27,27,0.08)] transition hover:border-[rgba(73,102,64,0.22)] hover:shadow-[0_20px_40px_rgba(28,27,27,0.12)] disabled:opacity-50"
+                      className="recall-quick-mic group flex flex-col items-center gap-2 rounded-[28px] border border-[var(--border-soft)] bg-[var(--panel)] px-4 py-3 text-center shadow-[var(--shadow-soft)] transition hover:border-[var(--primary)] disabled:opacity-50"
                     >
-                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(73,102,64,0.18)] bg-[rgba(255,255,255,0.92)]">
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[var(--border-soft)] bg-[var(--panel-soft)]">
                         {recorder.isRecording ? (
                           <span className="absolute inset-0 rounded-full border border-[rgba(73,102,64,0.22)] animate-ping" />
                         ) : null}
@@ -473,16 +483,16 @@ export default function StudyRecordPage() {
                   </div>
 
                   <div className="recall-voice-status mt-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
-                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                    <span className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-3 py-1.5">
                       {recorder.isRecording ? "Mic hot" : "Mic idle"}
                     </span>
-                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                    <span className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-3 py-1.5">
                       {voiceStatusLabel}
                     </span>
-                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                    <span className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-3 py-1.5">
                       {coach.state === "thinking" ? "Coach thinking" : "Coach ready"}
                     </span>
-                    <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
+                    <span className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-3 py-1.5">
                       {activeHint?.source === "ai"
                         ? "Live analysis"
                         : activeHint?.source === "fallback"
@@ -529,7 +539,7 @@ export default function StudyRecordPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.82))] px-4 py-4 text-sm leading-7 text-[var(--muted-foreground)]">
+              <div className="rounded-2xl border border-[var(--border-soft)] bg-[var(--panel-soft)] px-4 py-4 text-sm leading-7 text-[var(--muted-foreground)]">
                 <div className="flex items-center gap-2 text-[var(--foreground)]">
                   <Sparkles className="size-4 text-[var(--primary)]" />
                   <p className="font-semibold">Recall cue</p>
@@ -550,7 +560,7 @@ export default function StudyRecordPage() {
                     {activeHint.missing_concepts.map((item) => (
                       <span
                         key={item}
-                        className="rounded-full border border-[rgba(73,102,64,0.16)] bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]"
+                        className="rounded-full border border-[var(--border-soft)] bg-[var(--panel)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]"
                       >
                         {item}
                       </span>

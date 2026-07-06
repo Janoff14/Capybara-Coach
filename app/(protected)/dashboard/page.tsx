@@ -7,6 +7,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { ArrowRight, BookOpenText, CalendarClock, NotebookPen, PanelsTopLeft } from "lucide-react";
 
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api } from "@/lib/api";
 import { groupFlashcardsIntoDecks } from "@/lib/flashcards";
@@ -74,7 +75,9 @@ export default function DashboardPage() {
       </section>
 
       <section className="catalog-document-cards">
-        {documents.length === 0 ? (
+        {isLoading ? (
+          <div className="catalog-empty-card"><OperationProgress label="Loading your study desk" detail="Checking documents, sessions, notes, decks, and scheduled reviews." /></div>
+        ) : documents.length === 0 ? (
           <div className="catalog-empty-card"><BookOpenText /><h3>No source cards yet.</h3><p>Catalog a PDF to start the first study loop.</p></div>
         ) : documents.slice(0, 3).map((document, index) => (
           <article key={document.id} style={{ transform: `rotate(${index % 2 ? ".35" : "-.35"}deg)` }}>
@@ -90,7 +93,7 @@ export default function DashboardPage() {
         ))}
       </section>
 
-      <section className="catalog-dashboard-bottom">
+      {isLoading ? null : <section className="catalog-dashboard-bottom">
         <DeskList title="Checkout log" icon={<CalendarClock />}>
           {sessions.length === 0 ? <p className="catalog-list-empty">No sessions stamped yet.</p> : sessions.slice(0, 4).map((session) => (
             <Link key={session.id} href={sessionDestination(session)}>
@@ -113,7 +116,7 @@ export default function DashboardPage() {
             </Link>
           ))}
         </DeskList>
-      </section>
+      </section>}
     </div>
   );
 }
