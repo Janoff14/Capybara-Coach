@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { BookOpenText, LoaderCircle, Mic2, NotebookPen } from "lucide-react";
@@ -10,11 +10,13 @@ import { toast } from "sonner";
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, ApiError } from "@/lib/api";
+import { sessionDestination } from "@/lib/session-navigation";
 
 type Filter = "ALL" | "READING" | "READY";
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { token } = useAuth();
   const [pendingSessionKey, setPendingSessionKey] = useState<string | null>(null);
@@ -24,7 +26,16 @@ export default function DocumentsPage() {
   const sessionsQuery = useQuery({ queryKey: ["sessions"], enabled: Boolean(token), queryFn: () => api.getSessions(token!) });
   const documents = documentsQuery.data ?? [];
   const sessions = sessionsQuery.data ?? [];
-  const visibleDocuments = documents.filter((document) =>
+  const searchQuery = searchParams.get("q")?.trim() ?? "";
+  const normalizedQuery = searchQuery.toLocaleLowerCase();
+  const searchedDocuments = normalizedQuery
+    ? documents.filter((document) =>
+        [document.title, document.original_filename, document.extracted_text]
+          .filter(Boolean)
+          .some((value) => value.toLocaleLowerCase().includes(normalizedQuery)),
+      )
+    : documents;
+  const visibleDocuments = searchedDocuments.filter((document) =>
     filter === "READING" ? document.progress_percent > 0 && document.progress_percent < 100
       : filter === "READY" ? document.progress_percent >= 100
         : true,
@@ -55,7 +66,7 @@ export default function DocumentsPage() {
         <div className="catalog-folder-tabs">
           {(["ALL", "READING", "READY"] as Filter[]).map((item) => (
             <button key={item} type="button" className={filter === item ? "is-active" : ""} onClick={() => setFilter(item)}>
-              {item} ({item === "ALL" ? documents.length : documents.filter((document) => item === "READING" ? document.progress_percent > 0 && document.progress_percent < 100 : document.progress_percent >= 100).length})
+              {item} ({item === "ALL" ? searchedDocuments.length : searchedDocuments.filter((document) => item === "READING" ? document.progress_percent > 0 && document.progress_percent < 100 : document.progress_percent >= 100).length})
             </button>
           ))}
         </div>
@@ -68,7 +79,11 @@ export default function DocumentsPage() {
         {documentsQuery.isLoading ? (
           <div className="catalog-empty-card"><LoaderCircle className="reader-spin" /><h3>Reading the card index…</h3></div>
         ) : visibleDocuments.length === 0 ? (
-          <div className="catalog-empty-card"><BookOpenText /><h3>No cards in this drawer.</h3><p>Try another filter or catalog a new PDF.</p></div>
+          <div className="catalog-empty-card" role="status">
+            <BookOpenText />
+            <h3>{searchQuery ? "No cards match that search." : "No cards in this drawer."}</h3>
+            <p>{searchQuery ? <>Nothing matched “{searchQuery}”. Try another title or phrase.</> : "Try another filter or catalog a new PDF."}</p>
+          </div>
         ) : visibleDocuments.map((document, index) => (
           <article key={document.id} className="catalog-library-card" style={{ transform: `rotate(${index % 2 ? ".35" : "-.35"}deg)` }}>
             <span className="catalog-subject-tab">{document.source_type.slice(0, 4).toUpperCase()}</span>
@@ -97,7 +112,7 @@ export default function DocumentsPage() {
           {sessions.length === 0 ? <p>No sessions checked out yet.</p> : sessions.slice(0, 6).map((session) => {
             const document = documents.find((item) => item.id === session.document_id);
             return (
-              <button key={session.id} type="button" onClick={() => router.push(`/study/${session.id}/read`)}>
+              <button key={session.id} type="button" onClick={() => router.push(sessionDestination(session))}>
                 <strong>{document?.title ?? "Study session"}</strong><span>sess. {session.id.slice(0, 8)}</span>
                 <span>{formatDistanceToNow(new Date(session.updated_at), { addSuffix: true })}</span><em>{session.status.replaceAll("_", " ")}</em>
               </button>

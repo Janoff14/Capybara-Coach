@@ -6,34 +6,34 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { LoadingScreen } from "@/components/app/loading-screen";
 import { useAuth } from "@/components/providers/auth-provider";
-import { Button } from "@/components/ui/button";
 
 function AuthUnavailable() {
   const { authError, logout, refreshUser } = useAuth();
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6">
-      <div className="editorial-panel flex w-full max-w-md flex-col items-center rounded-[28px] border border-[var(--border-soft)] px-8 py-10 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full bg-[rgba(176,69,55,0.1)] text-[var(--danger)]">
-          <AlertTriangle className="size-6" />
-        </div>
-        <h1 className="mt-5 font-display text-2xl font-bold tracking-[-0.04em] text-[var(--foreground)]">
-          The study service is offline.
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
-          {authError ??
-            "We kept your session safe. Try reconnecting in a moment."}
-        </p>
-        <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row">
-          <Button className="flex-1" onClick={() => void refreshUser()}>
-            <RefreshCw className="size-4" />
-            Try again
-          </Button>
-          <Button className="flex-1" variant="secondary" onClick={logout}>
-            Sign in again
-          </Button>
-        </div>
-      </div>
+    <div className="reader-catalog reader-unavailable-screen">
+      <header className="reader-unavailable-masthead" aria-hidden="true">
+        <strong>Capybara Coach</strong>
+        <span>Reading room · service desk</span>
+      </header>
+      <main className="reader-unavailable-desk">
+        <section className="reader-unavailable-card" role="alert" aria-live="assertive">
+          <div className="reader-unavailable-stamp">Service paused</div>
+          <AlertTriangle aria-hidden="true" />
+          <p className="reader-overline">Circulation notice · connection required</p>
+          <h1>
+            The study service is offline.
+          </h1>
+          <p>{authError ?? "We kept your session safe. Try reconnecting in a moment."}</p>
+          <div className="reader-unavailable-actions">
+            <button type="button" className="is-primary" onClick={() => void refreshUser()}>
+              <RefreshCw aria-hidden="true" />
+              Try again
+            </button>
+            <button type="button" onClick={logout}>Sign in again</button>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

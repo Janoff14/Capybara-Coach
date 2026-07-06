@@ -270,6 +270,18 @@ class PipelineApiTests(unittest.TestCase):
                     ],
                 },
             ) as generate_capture_mock,
+            patch(
+                "app.api.routes.reviews.assess_flashcard_practice",
+                return_value={
+                    "protocol_version": 1,
+                    "score": 88,
+                    "rating": "easy",
+                    "summary": "Accurate, concise recall across the full deck.",
+                    "strengths": ["Both core ideas were recalled accurately."],
+                    "improvements": ["Keep the net-force wording precise."],
+                    "per_card": [],
+                },
+            ) as assess_flashcard_practice_mock,
         ):
             me_response = self.client.get("/auth/me", headers=headers)
             self.assertEqual(me_response.status_code, 200)
@@ -517,6 +529,56 @@ class PipelineApiTests(unittest.TestCase):
             self.assertEqual(grade_review_response.json()["last_rating"], "easy")
             self.assertEqual(grade_review_response.json()["current_interval_days"], 7)
             self.assertFalse(grade_review_response.json()["is_due"])
+
+            incomplete_attempt_response = self.client.post(
+                f"/reviews/{study_session['id']}/attempts",
+                headers=headers,
+                json={
+                    "answers": [
+                        {
+                            "flashcard_id": flashcards_response.json()[0]["id"],
+                            "answer": "Objects keep their motion unless force changes it.",
+                            "elapsed_seconds": 22,
+                        }
+                    ],
+                    "active_seconds": 22,
+                    "paused_seconds": 0,
+                },
+            )
+            self.assertEqual(incomplete_attempt_response.status_code, 400)
+
+            complete_attempt_response = self.client.post(
+                f"/reviews/{study_session['id']}/attempts",
+                headers=headers,
+                json={
+                    "answers": [
+                        {
+                            "flashcard_id": flashcards_response.json()[0]["id"],
+                            "answer": "Objects keep their state of motion unless a net force acts.",
+                            "elapsed_seconds": 22,
+                        },
+                        {
+                            "flashcard_id": flashcards_response.json()[1]["id"],
+                            "answer": "A net force changes the object's motion.",
+                            "elapsed_seconds": 15,
+                        },
+                    ],
+                    "active_seconds": 37,
+                    "paused_seconds": 9,
+                },
+            )
+            self.assertEqual(complete_attempt_response.status_code, 200)
+            self.assertEqual(complete_attempt_response.json()["score"], 88)
+            self.assertEqual(complete_attempt_response.json()["rating"], "easy")
+            self.assertEqual(complete_attempt_response.json()["active_seconds"], 37)
+            self.assertEqual(complete_attempt_response.json()["paused_seconds"], 9)
+            self.assertEqual(complete_attempt_response.json()["schedule"]["last_rating"], "easy")
+            self.assertEqual(complete_attempt_response.json()["schedule"]["completed_reviews"], 2)
+            self.assertEqual(complete_attempt_response.json()["schedule"]["current_interval_days"], 30)
+            self.assertEqual(
+                assess_flashcard_practice_mock.call_args.kwargs["answers"][0]["expected_answer"],
+                flashcards_response.json()[0]["answer"],
+            )
 
             typed_session_response = self.client.post(
                 "/sessions",

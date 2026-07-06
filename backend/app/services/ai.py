@@ -38,6 +38,61 @@ ASSESSMENT_WEIGHTS = {
     "depth": 0.14,
 }
 
+PRACTICE_PROTOCOL_VERSION = 1
+
+
+def assess_flashcard_practice(
+    *,
+    cards: list[dict[str, Any]],
+    answers: list[dict[str, Any]],
+    active_seconds: int,
+    paused_seconds: int,
+    settings: Settings,
+) -> dict[str, Any]:
+    fallback = _build_practice_assessment_fallback(
+        cards=cards,
+        answers=answers,
+        active_seconds=active_seconds,
+    )
+    if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
+        return fallback
+
+    prompt = f"""
+Assess a learner's complete written flashcard-deck attempt.
+
+Cards and answers:
+{json.dumps(answers, ensure_ascii=False)[:30000]}
+
+Timing:
+- active_seconds: {active_seconds}
+- paused_seconds: {paused_seconds}
+
+Return JSON only with these keys:
+- score (integer 0-100)
+- rating (exactly hard, medium, or easy)
+- summary
+- strengths (2-5 concise bullets)
+- improvements (2-5 concise bullets)
+- per_card (one object per card with flashcard_id, score 0-100, and feedback)
+
+Judge semantic correctness against expected_answer, not exact wording. Reward answers that are
+accurate, complete, direct, and concise. Penalize vague, padded, contradictory, or missing answers.
+Use time only as a secondary signal: a fast, high-quality complete attempt can be easy; a slower or
+mixed attempt is medium; substantial errors, omissions, or very labored recall is hard. Never call an
+inaccurate attempt easy merely because it was fast.
+"""
+    try:
+        content = _chat_json(
+            settings=settings,
+            system_prompt="You are a precise but constructive flashcard practice evaluator.",
+            user_prompt=prompt,
+            temperature=0,
+        )
+        payload = _parse_json_payload(content)
+        return _normalize_practice_assessment(payload, cards=cards, fallback=fallback)
+    except (RuntimeError, TypeError, ValueError, json.JSONDecodeError):
+        return fallback
+
 
 def _create_client(settings: Settings) -> AzureOpenAI:
     if not settings.azure_openai_endpoint or not settings.azure_openai_api_key:
@@ -954,6 +1009,139 @@ def _note_sections(value: Any) -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+def _normalize_practice_assessment(
+    payload: dict[str, Any],
+    *,
+    cards: list[dict[str, Any]],
+    fallback: dict[str, Any],
+) -> dict[str, Any]:
+    fallback_cards = {
+        str(item.get("flashcard_id")): item
+        for item in fallback.get("per_card", [])
+        if isinstance(item, dict)
+    }
+    supplied_cards = {
+        str(item.get("flashcard_id")): item
+        for item in payload.get("per_card", [])
+        if isinstance(item, dict) and item.get("flashcard_id")
+    }
+    per_card: list[dict[str, Any]] = []
+    for card in cards:
+        card_id = str(card.get("id") or "")
+        supplied = supplied_cards.get(card_id, {})
+        fallback_card = fallback_cards.get(card_id, {})
+        per_card.append(
+            {
+                "flashcard_id": card_id,
+                "score": _clamp_practice_score(
+                    supplied.get("score"),
+                    fallback_card.get("score", 0),
+                ),
+                "feedback": str(
+                    supplied.get("feedback")
+                    or fallback_card.get("feedback")
+                    or "Review this answer against the reference."
+                ).strip(),
+            }
+        )
+
+    score = _clamp_practice_score(payload.get("score"), fallback.get("score", 0))
+    rating = str(payload.get("rating") or "").strip().lower()
+    if rating not in {"hard", "medium", "easy"}:
+        rating = str(fallback.get("rating") or "hard")
+
+    return {
+        "protocol_version": PRACTICE_PROTOCOL_VERSION,
+        "score": score,
+        "rating": rating,
+        "summary": str(payload.get("summary") or fallback.get("summary") or "Attempt assessed.").strip(),
+        "strengths": _string_list(payload.get("strengths")) or fallback.get("strengths", []),
+        "improvements": _string_list(payload.get("improvements")) or fallback.get("improvements", []),
+        "per_card": per_card,
+    }
+
+
+def _build_practice_assessment_fallback(
+    *,
+    cards: list[dict[str, Any]],
+    answers: list[dict[str, Any]],
+    active_seconds: int,
+) -> dict[str, Any]:
+    answer_map = {str(item.get("flashcard_id")): item for item in answers}
+    per_card: list[dict[str, Any]] = []
+
+    for card in cards:
+        card_id = str(card.get("id") or "")
+        answer = answer_map.get(card_id, {})
+        expected_text = str(card.get("answer") or answer.get("expected_answer") or "")
+        attempted_text = str(answer.get("user_answer") or answer.get("answer") or "")
+        expected_tokens = _practice_tokens(expected_text)
+        attempted_tokens = _practice_tokens(attempted_text)
+        overlap = expected_tokens & attempted_tokens
+        precision = len(overlap) / max(1, len(attempted_tokens))
+        recall = len(overlap) / max(1, len(expected_tokens))
+        semantic_proxy = 0 if precision + recall == 0 else (2 * precision * recall) / (precision + recall)
+        length_ratio = len(attempted_tokens) / max(1, len(expected_tokens))
+        concision_factor = 1.0 if length_ratio <= 2.5 else max(0.72, 1.0 - ((length_ratio - 2.5) * 0.06))
+        score = round(100 * semantic_proxy * concision_factor)
+        if score >= 80:
+            feedback = "Accurate and direct; compare the wording for any small nuance you omitted."
+        elif score >= 55:
+            feedback = "The core idea is present, but the reference contains important detail to tighten."
+        else:
+            feedback = "This answer needs another pass; several central terms or relationships are missing."
+        per_card.append({"flashcard_id": card_id, "score": score, "feedback": feedback})
+
+    score = round(sum(item["score"] for item in per_card) / max(1, len(per_card)))
+    seconds_per_card = active_seconds / max(1, len(cards))
+    if score >= 85 and seconds_per_card <= 75:
+        rating = "easy"
+    elif score >= 62:
+        rating = "medium"
+    else:
+        rating = "hard"
+
+    strong_count = sum(1 for item in per_card if item["score"] >= 80)
+    weak_count = sum(1 for item in per_card if item["score"] < 55)
+    return {
+        "protocol_version": PRACTICE_PROTOCOL_VERSION,
+        "score": score,
+        "rating": rating,
+        "summary": (
+            f"You recalled {strong_count} of {len(cards)} cards strongly; "
+            f"{weak_count} need focused review."
+        ),
+        "strengths": [
+            f"{strong_count} answers were close, clear, and concise.",
+            f"The full deck was completed in {active_seconds} active seconds.",
+        ],
+        "improvements": [
+            f"Revisit the {weak_count} lowest-scoring answers before the next review.",
+            "Use the reference wording to recover missing relationships, not to memorize sentences verbatim.",
+        ],
+        "per_card": per_card,
+    }
+
+
+def _practice_tokens(value: str) -> set[str]:
+    stop_words = {
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in",
+        "is", "it", "of", "on", "or", "that", "the", "this", "to", "was", "were", "with",
+    }
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", value.lower())
+        if len(token) > 1 and token not in stop_words
+    }
+
+
+def _clamp_practice_score(value: Any, fallback: int) -> int:
+    try:
+        return max(0, min(100, round(float(value))))
+    except (TypeError, ValueError):
+        return max(0, min(100, int(fallback)))
 
 
 def _normalize_flashcards(value: Any) -> list[dict[str, Any]]:

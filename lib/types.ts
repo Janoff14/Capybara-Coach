@@ -96,6 +96,42 @@ export type ReviewScheduleRead = {
   updated_at: string;
 };
 
+export type PracticeAttemptInput = {
+  answers: Array<{
+    flashcard_id: string;
+    answer: string;
+    elapsed_seconds: number;
+  }>;
+  active_seconds: number;
+  paused_seconds: number;
+};
+
+export type PracticeAttemptAssessment = {
+  protocol_version: number;
+  score: number;
+  rating: "easy" | "medium" | "hard";
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  per_card: Array<{
+    flashcard_id: string;
+    score: number;
+    feedback: string;
+  }>;
+};
+
+export type PracticeAttemptRead = {
+  id: string;
+  study_session_id: string;
+  active_seconds: number;
+  paused_seconds: number;
+  rating: "easy" | "medium" | "hard";
+  score: number;
+  assessment: PracticeAttemptAssessment;
+  schedule: ReviewScheduleRead;
+  created_at: string;
+};
+
 export type NoteSection = {
   heading: string;
   body?: string;

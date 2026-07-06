@@ -4,7 +4,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
+import { Document, pdfjs } from "react-pdf";
 import {
   BookOpenText,
   Bookmark,
@@ -19,6 +19,7 @@ import {
 import type { ReaderSection } from "@/lib/document-reader";
 import type { ReaderHighlightType, ReaderKeyTerm } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { LazyPdfPage } from "@/components/app/lazy-pdf-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -334,11 +335,11 @@ function ReaderSurface({
                         )}
                       </div>
                       <div className="overflow-hidden rounded-[18px] border border-[rgba(28,27,27,0.06)] bg-white">
-                        <Page
+                        <LazyPdfPage
+                          eager={index + 1 === initialPage}
                           pageNumber={index + 1}
+                          scrollRoot={viewerRef}
                           width={pageWidth}
-                          renderAnnotationLayer
-                          renderTextLayer
                         />
                       </div>
                     </div>

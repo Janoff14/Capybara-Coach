@@ -63,3 +63,7 @@ class StudySession(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    practice_attempts: Mapped[list["PracticeAttempt"]] = relationship(
+        back_populates="study_session",
+        cascade="all, delete-orphan",
+    )

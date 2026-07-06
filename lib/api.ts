@@ -4,6 +4,8 @@ import type {
   FlashcardRead,
   LoginInput,
   NoteRead,
+  PracticeAttemptInput,
+  PracticeAttemptRead,
   RecallHintRead,
   ReviewScheduleRead,
   RegisterInput,
@@ -58,6 +60,8 @@ type ErrorPayload = {
   detail?: string | { message?: string } | null;
   message?: string | null;
 };
+
+export type UploadProgressCallback = (percent: number) => void;
 
 export class ApiError extends Error {
   status: number;
@@ -201,6 +205,84 @@ async function requestBlob(path: string, options: RequestOptions = {}) {
   return response.blob();
 }
 
+function uploadError(status: number, statusText: string, responseText: string) {
+  let message = statusText || `Request failed with status ${status}.`;
+
+  try {
+    const payload = JSON.parse(responseText) as ErrorPayload;
+    const detail = payload.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      message = detail;
+    } else if (
+      detail &&
+      typeof detail === "object" &&
+      typeof detail.message === "string" &&
+      detail.message.trim()
+    ) {
+      message = detail.message;
+    } else if (typeof payload.message === "string" && payload.message.trim()) {
+      message = payload.message;
+    }
+  } catch {
+    // Keep the status fallback when the response is not JSON.
+  }
+
+  if (status >= 500 || (status === 404 && /application not found/i.test(message))) {
+    return new ApiUnavailableError(
+      "The study service is temporarily unavailable. Please try again shortly.",
+      status,
+    );
+  }
+
+  return new ApiError(message, status);
+}
+
+function uploadRequest<T>(
+  path: string,
+  token: string,
+  formData: FormData,
+  onProgress?: UploadProgressCallback,
+) {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}${path}`);
+    xhr.timeout = LONG_REQUEST_TIMEOUT_MS;
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.addEventListener("loadstart", () => onProgress?.(0));
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable || event.total <= 0) return;
+      onProgress?.(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+    });
+    xhr.upload.addEventListener("load", () => onProgress?.(100));
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(uploadError(xhr.status, xhr.statusText, xhr.responseText));
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(xhr.responseText) as T);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    xhr.addEventListener("timeout", () => {
+      reject(new ApiUnavailableError("The study service took too long to respond. Please try again."));
+    });
+    xhr.addEventListener("error", () => {
+      reject(new ApiUnavailableError("The study service is unreachable. Check your connection and try again."));
+    });
+    xhr.addEventListener("abort", () => {
+      reject(new ApiUnavailableError("The upload was cancelled."));
+    });
+
+    xhr.send(formData);
+  });
+}
+
 export const api = {
   register(values: RegisterInput) {
     return request<TokenResponse>("/auth/register", {
@@ -240,7 +322,7 @@ export const api = {
     });
   },
 
-  uploadDocument(token: string, input: UploadDocumentInput) {
+  uploadDocument(token: string, input: UploadDocumentInput, onProgress?: UploadProgressCallback) {
     const formData = new FormData();
     formData.append("file", input.file);
 
@@ -249,12 +331,7 @@ export const api = {
       formData.append("title", trimmedTitle);
     }
 
-    return request<DocumentRead>("/documents/upload", {
-      method: "POST",
-      token,
-      body: formData,
-      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
-    });
+    return uploadRequest<DocumentRead>("/documents/upload", token, formData, onProgress);
   },
 
   getSessions(token: string) {
@@ -304,16 +381,11 @@ export const api = {
     });
   },
 
-  uploadSessionAudio(token: string, sessionId: string, file: File) {
+  uploadSessionAudio(token: string, sessionId: string, file: File, onProgress?: UploadProgressCallback) {
     const formData = new FormData();
     formData.append("file", file);
 
-    return request<StudySessionRead>(`/sessions/${sessionId}/audio`, {
-      method: "POST",
-      token,
-      body: formData,
-      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
-    });
+    return uploadRequest<StudySessionRead>(`/sessions/${sessionId}/audio`, token, formData, onProgress);
   },
 
   getRecallHint(
@@ -393,6 +465,15 @@ export const api = {
       method: "POST",
       token,
       json: { rating },
+    });
+  },
+
+  assessPracticeAttempt(token: string, sessionId: string, input: PracticeAttemptInput) {
+    return request<PracticeAttemptRead>(`/reviews/${sessionId}/attempts`, {
+      method: "POST",
+      token,
+      json: input,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     });
   },
 };

@@ -6,6 +6,7 @@ import { FileUp } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/providers/auth-provider";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +39,7 @@ export function UploadDocumentDialog({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -56,12 +58,14 @@ export function UploadDocumentDialog({
         throw new Error("PDF files only for this MVP.");
       }
 
-      return api.uploadDocument(token, { file, title });
+      setUploadProgress(0);
+      return api.uploadDocument(token, { file, title }, setUploadProgress);
     },
     onSuccess: async (document) => {
       toast.success("Document uploaded.");
       setTitle("");
       setFile(null);
+      setUploadProgress(null);
       setOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
       onUploaded?.(document);
@@ -72,6 +76,7 @@ export function UploadDocumentDialog({
           ? error.message
           : "Document upload failed.";
       toast.error(message);
+      setUploadProgress(null);
     },
   });
 
@@ -83,17 +88,18 @@ export function UploadDocumentDialog({
           {buttonLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Upload a study document</DialogTitle>
+      <DialogContent className="reader-upload-dialog">
+        <DialogHeader className="reader-upload-header">
+          <p className="reader-overline">Circulation desk · new acquisition</p>
+          <DialogTitle>Catalog a study document</DialogTitle>
           <DialogDescription>
             PDFs only for the demo. We store the original file, extract its text,
             and make it available for study sessions.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
-          <div className="space-y-2">
+        <div className="reader-upload-form">
+          <div className="reader-upload-field">
             <Label htmlFor="document-title">Title (optional)</Label>
             <Input
               id="document-title"
@@ -103,19 +109,19 @@ export function UploadDocumentDialog({
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="reader-upload-field">
             <Label htmlFor="document-file">PDF file</Label>
             <label
               htmlFor="document-file"
-              className="flex cursor-pointer flex-col items-center justify-center rounded-[24px] border border-dashed border-[var(--border-soft)] bg-[var(--panel-soft)] px-6 py-8 text-center transition-colors hover:border-[rgba(75,102,72,0.28)] hover:bg-[rgba(205,235,197,0.12)]"
+              className="reader-upload-dropzone"
             >
-              <FileUp className="mb-4 size-8 text-[var(--primary)]" />
-              <p className="font-display text-lg font-bold tracking-[-0.03em] text-[var(--foreground)]">
+              <FileUp aria-hidden="true" />
+              <p>
                 Choose a PDF file
               </p>
-              <p className="mt-2 max-w-sm text-sm leading-6 text-[var(--muted-foreground)]">
+              <span>
                 We will keep the original file, extract readable text, and prepare it for the study flow.
-              </p>
+              </span>
               <input
                 id="document-file"
                 className="sr-only"
@@ -124,13 +130,22 @@ export function UploadDocumentDialog({
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
             </label>
-            <p className="text-xs text-[var(--muted-foreground)]">
+            <p className="reader-upload-file" role="status">
               {file ? `Selected: ${file.name}` : "Choose a single PDF file."}
             </p>
           </div>
 
+          {uploadMutation.isPending ? (
+            <OperationProgress
+              compact
+              label={uploadProgress === 100 ? "Extracting text and filing card" : "Uploading PDF"}
+              detail={uploadProgress === 100 ? "The file arrived. The catalog is reading and indexing it now." : file?.name}
+              value={uploadProgress === 100 ? null : uploadProgress}
+            />
+          ) : null}
+
           <Button
-            className="w-full"
+            className="reader-upload-submit"
             onClick={() => uploadMutation.mutate()}
             disabled={uploadMutation.isPending}
           >

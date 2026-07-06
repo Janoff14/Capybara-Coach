@@ -28,8 +28,8 @@ export function CapybaraCoach({
   state: CoachState;
 }) {
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-40 flex max-w-[calc(100vw-2rem)] items-end gap-3 md:bottom-6 md:right-6">
-      <div className="max-w-72 rounded-[24px] border border-[rgba(229,226,225,0.92)] bg-[rgba(255,255,255,0.92)] px-4 py-3 shadow-[0_18px_40px_rgba(28,27,27,0.12)] backdrop-blur-md">
+    <div className="reader-coach pointer-events-none fixed bottom-5 right-5 z-40 flex max-w-[calc(100vw-2rem)] items-end gap-3 md:bottom-6 md:right-6">
+      <div className="reader-coach-message max-w-72 rounded-[24px] border border-[rgba(229,226,225,0.92)] bg-[rgba(255,255,255,0.92)] px-4 py-3 shadow-[0_18px_40px_rgba(28,27,27,0.12)] backdrop-blur-md">
         <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
           <span>{STATE_LABELS[state]}</span>
           {promptType ? (
@@ -41,7 +41,7 @@ export function CapybaraCoach({
         <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">{message}</p>
       </div>
 
-      <div className="relative h-20 w-20 shrink-0">
+      <div className="reader-coach-avatar relative h-20 w-20 shrink-0">
         <div className="absolute left-3 top-0 h-5 w-5 rounded-full border border-[rgba(91,70,48,0.2)] bg-[linear-gradient(180deg,#b28a63,#8b6948)]" />
         <div className="absolute right-3 top-0 h-5 w-5 rounded-full border border-[rgba(91,70,48,0.2)] bg-[linear-gradient(180deg,#b28a63,#8b6948)]" />
         <div

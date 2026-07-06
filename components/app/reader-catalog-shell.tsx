@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { LogOut, Search } from "lucide-react";
 
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
@@ -29,6 +30,7 @@ export function ReaderCatalogShell({
   fullBleed = false,
   onLogout,
 }: ReaderCatalogShellProps) {
+  const router = useRouter();
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [chainPulled, setChainPulled] = useState(false);
 
@@ -47,6 +49,13 @@ export function ReaderCatalogShell({
     };
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.readerTheme = theme;
+    return () => {
+      delete document.documentElement.dataset.readerTheme;
+    };
+  }, [theme]);
+
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -59,6 +68,14 @@ export function ReaderCatalogShell({
     }
   };
 
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const input = event.currentTarget.elements.namedItem("q");
+    const query = input instanceof HTMLInputElement ? input.value.trim() : "";
+    if (!query) return;
+    router.push(`/documents?q=${encodeURIComponent(query)}`);
+  };
+
   return (
     <div className="reader-catalog" data-theme={theme}>
       <header className="reader-catalog-header">
@@ -68,11 +85,17 @@ export function ReaderCatalogShell({
           </Link>
 
           <div className="reader-catalog-utilities">
-            <label className="reader-catalog-search">
+            <form className="reader-catalog-search" role="search" onSubmit={handleSearchSubmit}>
               <Search aria-hidden="true" />
-              <span className="sr-only">Find a card</span>
-              <input type="search" placeholder="Find a card…" />
-            </label>
+              <label className="sr-only" htmlFor="reader-catalog-search">Find a card</label>
+              <input
+                id="reader-catalog-search"
+                name="q"
+                type="search"
+                placeholder="Find a card…"
+              />
+              <button type="submit" className="reader-catalog-search-submit">Search</button>
+            </form>
 
             <button
               type="button"

@@ -41,3 +41,7 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    practice_attempts: Mapped[list["PracticeAttempt"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

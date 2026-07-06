@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { MetricCard } from "@/components/app/metric-card";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { PageHeader } from "@/components/app/page-header";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -302,6 +303,23 @@ export default function AssessmentPage() {
   const canOpenNotes = Boolean(session?.note);
   const hasFlashcards = (flashcardsQuery.data?.length ?? 0) > 0;
   const hasStrictnessChanged = strictness !== appliedStrictness;
+  const activeOperation = rerunAssessmentMutation.isPending
+    ? {
+        label: "Reassessing your recall",
+        detail: "Applying the selected strictness and comparing your transcript with the source again.",
+      }
+    : generateNotesMutation.isPending
+      ? {
+          label: "Generating polished notes",
+          detail: "Structuring the transcript, source material, and assessment into a reusable note.",
+        }
+      : generateFlashcardsMutation.isPending
+        ? {
+            label: "Building the flashcard deck",
+            detail: "Selecting useful prompts and concise reference answers from the assessed material.",
+          }
+        : null;
+  const isLongOperationPending = Boolean(activeOperation);
 
   return (
     <div className="catalog-study-page catalog-assessment-page space-y-8">
@@ -315,6 +333,10 @@ export default function AssessmentPage() {
         }
         actions={session ? <SessionStatusBadge status={session.status} /> : null}
       />
+
+      {activeOperation ? (
+        <OperationProgress label={activeOperation.label} detail={activeOperation.detail} />
+      ) : null}
 
       {sessionQuery.isLoading ? (
         <Card>
@@ -429,7 +451,7 @@ export default function AssessmentPage() {
                   className="w-full"
                   variant={hasStrictnessChanged ? "default" : "secondary"}
                   onClick={() => rerunAssessmentMutation.mutate()}
-                  disabled={rerunAssessmentMutation.isPending || !hasStrictnessChanged}
+                  disabled={isLongOperationPending || !hasStrictnessChanged}
                 >
                   <RefreshCw className={rerunAssessmentMutation.isPending ? "size-4 animate-spin" : "size-4"} />
                   {rerunAssessmentMutation.isPending
@@ -501,7 +523,7 @@ export default function AssessmentPage() {
                   <Button
                     className="w-full"
                     onClick={() => generateNotesMutation.mutate()}
-                    disabled={generateNotesMutation.isPending}
+                    disabled={isLongOperationPending}
                   >
                     {generateNotesMutation.isPending ? "Generating notes..." : "Generate notes"}
                   </Button>
@@ -513,7 +535,7 @@ export default function AssessmentPage() {
                         ? router.push(`/practice?sessionId=${params.sessionId}`)
                         : generateFlashcardsMutation.mutate()
                     }
-                    disabled={generateFlashcardsMutation.isPending}
+                    disabled={isLongOperationPending}
                   >
                     <PanelsTopLeft className="size-4" />
                     {generateFlashcardsMutation.isPending

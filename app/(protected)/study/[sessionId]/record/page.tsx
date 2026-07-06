@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { CapybaraCoach } from "@/components/app/capybara-coach";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { RecallSessionPanel } from "@/components/app/recall-session-panel";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
 import { VoiceWaveform } from "@/components/app/voice-waveform";
@@ -56,6 +57,8 @@ export default function StudyRecordPage() {
   const [enteredFromReader] = useState(autoStartRequested);
   const [activeHint, setActiveHint] = useState<RecallHintRead | null>(null);
   const [recallTranscript, setRecallTranscript] = useState("");
+  const [processingStage, setProcessingStage] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const currentPauseHintedRef = useRef(false);
   const lastHintAtRef = useRef(0);
   const hintCountRef = useRef(0);
@@ -96,8 +99,13 @@ export default function StudyRecordPage() {
         { type: recorder.mimeType || "audio/webm" },
       );
 
-      await api.uploadSessionAudio(token, params.sessionId, file);
+      setProcessingStage("Uploading recording");
+      setUploadProgress(0);
+      await api.uploadSessionAudio(token, params.sessionId, file, setUploadProgress);
+      setUploadProgress(null);
+      setProcessingStage("Transcribing your recall");
       await api.transcribeSession(token, params.sessionId);
+      setProcessingStage("Assessing coverage and clarity");
       return api.assessSession(token, params.sessionId);
     },
     onSuccess: async () => {
@@ -112,6 +120,10 @@ export default function StudyRecordPage() {
           ? error.message
           : "Audio submission failed.";
       toast.error(message);
+    },
+    onSettled: () => {
+      setProcessingStage(null);
+      setUploadProgress(null);
     },
   });
 
@@ -399,8 +411,8 @@ export default function StudyRecordPage() {
           description="The MVP targets desktop Chromium. Open the app in Chrome or Edge to use the MediaRecorder flow."
         />
       ) : (
-        <div className="surface-grid xl:grid-cols-[1.15fr_0.85fr] xl:grid">
-          <Card>
+        <div className="surface-grid recall-layout-grid xl:grid-cols-[1.15fr_0.85fr] xl:grid">
+          <Card className="recall-recorder-card">
             <CardHeader>
               <CardTitle>Recall recorder</CardTitle>
               <CardDescription>
@@ -408,9 +420,9 @@ export default function StudyRecordPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.88))] p-5 shadow-[0_20px_40px_rgba(28,27,27,0.08)]">
-                  <div className="flex items-center justify-between gap-3">
+              <div className="recall-recorder-grid grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="recall-mic-panel rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-[linear-gradient(180deg,rgba(73,102,64,0.08),rgba(255,255,255,0.88))] p-5 shadow-[0_20px_40px_rgba(28,27,27,0.08)]">
+                  <div className="recall-mic-header flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]">
                         Live microphone
@@ -433,7 +445,7 @@ export default function StudyRecordPage() {
                         handleStartRecording();
                       }}
                       disabled={submitMutation.isPending}
-                      className="group flex flex-col items-center gap-2 rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-white px-4 py-3 text-center shadow-[0_16px_34px_rgba(28,27,27,0.08)] transition hover:border-[rgba(73,102,64,0.22)] hover:shadow-[0_20px_40px_rgba(28,27,27,0.12)] disabled:opacity-50"
+                      className="recall-quick-mic group flex flex-col items-center gap-2 rounded-[28px] border border-[rgba(73,102,64,0.12)] bg-white px-4 py-3 text-center shadow-[0_16px_34px_rgba(28,27,27,0.08)] transition hover:border-[rgba(73,102,64,0.22)] hover:shadow-[0_20px_40px_rgba(28,27,27,0.12)] disabled:opacity-50"
                     >
                       <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(73,102,64,0.18)] bg-[rgba(255,255,255,0.92)]">
                         {recorder.isRecording ? (
@@ -460,7 +472,7 @@ export default function StudyRecordPage() {
                     />
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
+                  <div className="recall-voice-status mt-4 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--muted-foreground)]">
                     <span className="rounded-full border border-[var(--border-soft)] bg-white px-3 py-1.5">
                       {recorder.isRecording ? "Mic hot" : "Mic idle"}
                     </span>
@@ -597,6 +609,20 @@ export default function StudyRecordPage() {
                 </div>
               ) : null}
 
+              {submitMutation.isPending && processingStage ? (
+                <OperationProgress
+                  label={processingStage}
+                  detail={
+                    processingStage === "Uploading recording"
+                      ? "Sending the captured audio to the study service."
+                      : processingStage === "Transcribing your recall"
+                        ? "Turning your recording into text. This stage has no reliable percentage."
+                        : "Comparing your explanation with the source and preparing feedback."
+                  }
+                  value={processingStage === "Uploading recording" ? uploadProgress : null}
+                />
+              ) : null}
+
               <Button
                 className="w-full"
                 size="lg"
@@ -604,9 +630,7 @@ export default function StudyRecordPage() {
                 disabled={!recorder.audioBlob || recorder.isRecording || submitMutation.isPending}
               >
                 <Upload className="size-4" />
-                {submitMutation.isPending
-                  ? "Uploading, transcribing, and assessing..."
-                  : "Submit recall"}
+                {submitMutation.isPending ? processingStage ?? "Working…" : "Submit recall"}
               </Button>
             </CardContent>
           </Card>

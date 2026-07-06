@@ -10,6 +10,7 @@ import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api } from "@/lib/api";
 import { groupFlashcardsIntoDecks } from "@/lib/flashcards";
+import { sessionDestination } from "@/lib/session-navigation";
 
 export default function DashboardPage() {
   const { token } = useAuth();
@@ -92,7 +93,7 @@ export default function DashboardPage() {
       <section className="catalog-dashboard-bottom">
         <DeskList title="Checkout log" icon={<CalendarClock />}>
           {sessions.length === 0 ? <p className="catalog-list-empty">No sessions stamped yet.</p> : sessions.slice(0, 4).map((session) => (
-            <Link key={session.id} href={`/study/${session.id}/read`}>
+            <Link key={session.id} href={sessionDestination(session)}>
               <span><strong>{documentMap.get(session.document_id)?.title ?? "Study session"}</strong><small>sess. {session.id.slice(0, 8)}</small></span>
               <em>{session.status.replaceAll("_", " ")}</em>
             </Link>

@@ -10,6 +10,7 @@ import { SplitStudyWorkspace } from "@/components/app/split-study-workspace";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, ApiError } from "@/lib/api";
 import type {
+  DocumentRead,
   StudySessionRead,
   TypedCaptureChunk,
   TypedChunkCategory,
@@ -182,13 +183,21 @@ export default function StudyCapturePage() {
       return;
     }
 
+    const previousMarkerPage = manualMarkerPage;
+    setManualMarkerPage(currentPage);
     setIsMarking(true);
     try {
-      await api.saveDocumentProgress(token, documentId, currentPage);
-      setManualMarkerPage(currentPage);
-      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      const updatedDocument = await api.saveDocumentProgress(token, documentId, currentPage);
+      queryClient.setQueryData(["documents", documentId], updatedDocument);
+      queryClient.setQueryData<DocumentRead[]>(["documents"], (documents) =>
+        documents?.map((document) =>
+          document.id === documentId ? updatedDocument : document,
+        ),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["documents"] });
       toast.success(`Page ${currentPage} marked as your resume point.`);
     } catch (error) {
+      setManualMarkerPage(previousMarkerPage);
       toast.error(errorMessage(error, "Could not save this page marker."));
     } finally {
       setIsMarking(false);
@@ -211,8 +220,8 @@ export default function StudyCapturePage() {
       setProcessingStage("Organizing your note and flashcards...");
       return api.processTypedCapture(token, params.sessionId);
     },
-    onSuccess: async (session) => {
-      await Promise.all([
+    onSuccess: (session) => {
+      void Promise.all([
         queryClient.invalidateQueries({ queryKey: ["documents"] }),
         queryClient.invalidateQueries({ queryKey: ["sessions"] }),
         queryClient.invalidateQueries({ queryKey: ["notes"] }),

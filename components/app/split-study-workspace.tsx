@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { Document as PdfDocument, Page, pdfjs } from "react-pdf";
+import { Document as PdfDocument, pdfjs } from "react-pdf";
 import {
   Bookmark,
   BookOpenText,
@@ -26,6 +26,8 @@ import {
 } from "lucide-react";
 
 import type { TypedCaptureChunk, TypedChunkCategory } from "@/lib/types";
+import { LazyPdfPage } from "@/components/app/lazy-pdf-page";
+import { OperationProgress } from "@/components/app/operation-progress";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -322,7 +324,12 @@ export function SplitStudyWorkspace({
                         {isResumePage ? <strong><Bookmark aria-hidden="true" /> Saved marker</strong> : null}
                       </div>
                       <div className="reader-pdf-canvas">
-                        <Page pageNumber={page} width={pageWidth} renderAnnotationLayer renderTextLayer />
+                        <LazyPdfPage
+                          eager={page === initialPage}
+                          pageNumber={page}
+                          scrollRoot={viewerRef}
+                          width={pageWidth}
+                        />
                       </div>
                       <p className="reader-page-number">— {page} —</p>
                     </article>
@@ -363,6 +370,13 @@ export function SplitStudyWorkspace({
                 ? "Syncing your latest changes…"
                 : "Sends the trail to the AI for note + flashcard generation."}
           </p>
+          {isFinishing && processingStage ? (
+            <OperationProgress
+              compact
+              label={processingStage}
+              detail="Keep this page open while the session is filed."
+            />
+          ) : null}
         </header>
 
         <div ref={timelineRef} className="reader-stream">
