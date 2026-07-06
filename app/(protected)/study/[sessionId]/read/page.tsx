@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { DocumentReader } from "@/components/app/document-reader";
+import { OperationProgress } from "@/components/app/operation-progress";
 import { PageHeader } from "@/components/app/page-header";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -111,6 +112,13 @@ export default function StudyReadPage() {
           </>
         }
       />
+
+      {finishMutation.isPending ? (
+        <OperationProgress
+          label="Opening recall mode"
+          detail="Saving your reading position and preparing the recorder."
+        />
+      ) : null}
 
       <DocumentReader
         blob={documentFileQuery.data ?? null}

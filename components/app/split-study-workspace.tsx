@@ -118,7 +118,7 @@ export function SplitStudyWorkspace({
   const [draft, setDraft] = useState("");
   const [category, setCategory] = useState<TypedChunkCategory>("study_material");
   const [numPages, setNumPages] = useState(0);
-  const [pageWidth, setPageWidth] = useState(760);
+  const [pageWidth, setPageWidth] = useState(0);
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState(12);
   const viewerRef = useRef<HTMLDivElement | null>(null);
@@ -180,9 +180,13 @@ export function SplitStudyWorkspace({
       (entries) => {
         entries.forEach((entry) => {
           const page = Number((entry.target as HTMLElement).dataset.pdfPage);
-          ratios.set(page, entry.isIntersecting ? entry.intersectionRatio : 0);
+          if (entry.isIntersecting) ratios.set(page, entry.intersectionRatio);
+          else ratios.delete(page);
         });
-        const visible = [...ratios.entries()].sort((a, b) => b[1] - a[1])[0];
+        let visible: [number, number] | undefined;
+        ratios.forEach((ratio, page) => {
+          if (!visible || ratio > visible[1]) visible = [page, ratio];
+        });
         if (visible && visible[1] > 0) onCurrentPageChange(visible[0]);
       },
       { root: node, threshold: [0, 0.2, 0.45, 0.7] },
@@ -261,10 +265,10 @@ export function SplitStudyWorkspace({
               type="button"
               className={markedPage === currentPage ? "reader-mark-button is-marked" : "reader-mark-button"}
               onClick={onMarkPage}
-              disabled={!blobUrl || Boolean(error) || isMarking}
+              disabled={!blobUrl || Boolean(error)}
             >
               <Bookmark aria-hidden="true" />
-              {isMarking ? "Marking…" : markedPage === currentPage ? "Spot marked" : "Mark my spot"}
+              {isMarking ? "Marked · syncing" : markedPage === currentPage ? "Spot marked" : "Mark my spot"}
             </button>
           </div>
 
@@ -324,12 +328,15 @@ export function SplitStudyWorkspace({
                         {isResumePage ? <strong><Bookmark aria-hidden="true" /> Saved marker</strong> : null}
                       </div>
                       <div className="reader-pdf-canvas">
-                        <LazyPdfPage
-                          eager={page === initialPage}
-                          pageNumber={page}
-                          scrollRoot={viewerRef}
-                          width={pageWidth}
-                        />
+                        {pageWidth > 0 ? (
+                          <LazyPdfPage
+                            eager={page === initialPage}
+                            pageNumber={page}
+                            renderInteractiveLayers={false}
+                            scrollRoot={viewerRef}
+                            width={pageWidth}
+                          />
+                        ) : null}
                       </div>
                       <p className="reader-page-number">— {page} —</p>
                     </article>

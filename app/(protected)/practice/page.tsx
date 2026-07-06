@@ -169,7 +169,8 @@ function PracticeDeckPlayer({
   const [cardSeconds, setCardSeconds] = useState<Record<string, number>>({});
   const [activeSeconds, setActiveSeconds] = useState(0);
   const [pausedSeconds, setPausedSeconds] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [isPaused, setIsPaused] = useState(true);
   const [result, setResult] = useState<PracticeAttemptRead | null>(null);
   const activeCard = deck.cards[cardIndex];
   const answeredCount = deck.cards.filter((card) => answers[card.id]?.trim()).length;
@@ -206,7 +207,7 @@ function PracticeDeckPlayer({
   });
 
   useEffect(() => {
-    if (result || attemptMutation.isPending) return;
+    if (!hasStarted || result || attemptMutation.isPending) return;
     const intervalId = window.setInterval(() => {
       if (isPaused) {
         setPausedSeconds((seconds) => seconds + 1);
@@ -219,21 +220,22 @@ function PracticeDeckPlayer({
       }));
     }, 1000);
     return () => window.clearInterval(intervalId);
-  }, [activeCard.id, attemptMutation.isPending, isPaused, result]);
+  }, [activeCard.id, attemptMutation.isPending, hasStarted, isPaused, result]);
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.hidden && !result && !attemptMutation.isPending) setIsPaused(true);
+      if (document.hidden && hasStarted && !result && !attemptMutation.isPending) setIsPaused(true);
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [attemptMutation.isPending, result]);
+  }, [attemptMutation.isPending, hasStarted, result]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
+        !hasStarted ||
         isPaused ||
         result ||
         attemptMutation.isPending
@@ -247,7 +249,7 @@ function PracticeDeckPlayer({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [attemptMutation.isPending, deck.cards.length, isPaused, result]);
+  }, [attemptMutation.isPending, deck.cards.length, hasStarted, isPaused, result]);
 
   const go = (direction: number) => {
     setCardIndex((current) =>
@@ -261,7 +263,8 @@ function PracticeDeckPlayer({
     setCardSeconds({});
     setActiveSeconds(0);
     setPausedSeconds(0);
-    setIsPaused(false);
+    setHasStarted(false);
+    setIsPaused(true);
     setResult(null);
     attemptMutation.reset();
   };
@@ -290,24 +293,33 @@ function PracticeDeckPlayer({
             }))}
             rows={7}
             maxLength={6000}
-            disabled={isPaused || attemptMutation.isPending}
+            disabled={!hasStarted || isPaused || attemptMutation.isPending}
             placeholder="Explain it from memory. Aim for accurate, complete, and concise."
           />
           <footer>
             <span>{answers[activeCard.id]?.length ?? 0} / 6000</span>
             <span><Clock3 aria-hidden="true" /> {formatDuration(cardSeconds[activeCard.id] ?? 0)} on this card</span>
           </footer>
-          {isPaused ? (
+          {!hasStarted || isPaused ? (
             <div className="catalog-practice-paused">
-              <Pause aria-hidden="true" />
-              <strong>Practice paused</strong>
-              <span>Your active time is frozen.</span>
+              {hasStarted ? <Pause aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
+              <strong>{hasStarted ? "Practice paused" : "Ready when you are"}</strong>
+              <span>{hasStarted ? "Your active time is frozen." : "The clock starts only when you choose to begin."}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setHasStarted(true);
+                  setIsPaused(false);
+                }}
+              >
+                <Play aria-hidden="true" /> {hasStarted ? "Resume attempt" : "Start timed attempt"}
+              </button>
             </div>
           ) : null}
         </article>
 
         <div className="catalog-card-nav">
-          <button type="button" onClick={() => go(-1)} disabled={cardIndex === 0 || isPaused}>
+          <button type="button" onClick={() => go(-1)} disabled={cardIndex === 0 || !hasStarted || isPaused}>
             <ArrowLeft /> Prev
           </button>
           <div>
@@ -317,7 +329,7 @@ function PracticeDeckPlayer({
                 type="button"
                 className={index === cardIndex ? "is-current" : answers[card.id]?.trim() ? "is-graded" : ""}
                 onClick={() => setCardIndex(index)}
-                disabled={isPaused}
+                disabled={!hasStarted || isPaused}
                 aria-label={`Open card ${index + 1}${answers[card.id]?.trim() ? ", answered" : ""}`}
               />
             ))}
@@ -325,7 +337,7 @@ function PracticeDeckPlayer({
           <button
             type="button"
             onClick={() => go(1)}
-            disabled={cardIndex === deck.cards.length - 1 || isPaused}
+            disabled={cardIndex === deck.cards.length - 1 || !hasStarted || isPaused}
           >
             Next <ArrowRight />
           </button>
@@ -342,7 +354,7 @@ function PracticeDeckPlayer({
           <button
             type="button"
             onClick={() => attemptMutation.mutate()}
-            disabled={!allAnswered || isPaused || attemptMutation.isPending}
+            disabled={!hasStarted || !allAnswered || isPaused || attemptMutation.isPending}
           >
             <Send aria-hidden="true" /> Assess complete attempt
           </button>
@@ -370,7 +382,7 @@ function PracticeDeckPlayer({
           <button
             type="button"
             onClick={() => setIsPaused((paused) => !paused)}
-            disabled={attemptMutation.isPending || Boolean(result)}
+            disabled={!hasStarted || attemptMutation.isPending || Boolean(result)}
           >
             {isPaused ? <Play aria-hidden="true" /> : <Pause aria-hidden="true" />}
             {isPaused ? "Resume attempt" : "Pause attempt"}

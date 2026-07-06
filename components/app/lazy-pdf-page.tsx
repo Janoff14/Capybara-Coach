@@ -6,6 +6,7 @@ import { Page } from "react-pdf";
 type LazyPdfPageProps = {
   eager?: boolean;
   pageNumber: number;
+  renderInteractiveLayers?: boolean;
   scrollRoot: RefObject<HTMLElement | null>;
   width: number;
 };
@@ -13,6 +14,7 @@ type LazyPdfPageProps = {
 export function LazyPdfPage({
   eager = false,
   pageNumber,
+  renderInteractiveLayers = true,
   scrollRoot,
   width,
 }: LazyPdfPageProps) {
@@ -39,7 +41,7 @@ export function LazyPdfPage({
       },
       {
         root,
-        rootMargin: "900px 0px",
+        rootMargin: "320px 0px",
         threshold: 0.01,
       },
     );
@@ -59,8 +61,8 @@ export function LazyPdfPage({
         <Page
           pageNumber={pageNumber}
           width={width}
-          renderAnnotationLayer
-          renderTextLayer
+          renderAnnotationLayer={renderInteractiveLayers}
+          renderTextLayer={renderInteractiveLayers}
           onRenderSuccess={() => setHasRendered(true)}
           loading={<div className="lazy-pdf-page-placeholder">Rendering page {pageNumber}…</div>}
         />

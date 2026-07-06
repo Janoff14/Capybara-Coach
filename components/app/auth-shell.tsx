@@ -11,23 +11,17 @@ type AuthShellProps = {
 };
 
 export function AuthShell({ title, description, mode, children }: AuthShellProps) {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document !== "undefined" && document.documentElement.dataset.readerTheme === "dark"
+      ? "dark"
+      : "light",
+  );
   const [chainPulled, setChainPulled] = useState(false);
 
   useEffect(() => {
-    let frameId: number | null = null;
-    try {
-      const saved = window.localStorage.getItem("capy-reader-theme");
-      if (saved === "light" || saved === "dark") {
-        frameId = window.requestAnimationFrame(() => setTheme(saved));
-      }
-    } catch {
-      // The desk still works without persisted theme state.
-    }
-    return () => {
-      if (frameId !== null) window.cancelAnimationFrame(frameId);
-    };
-  }, []);
+    document.documentElement.dataset.readerTheme = theme;
+    document.documentElement.style.colorScheme = theme;
+  }, [theme]);
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";

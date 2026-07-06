@@ -84,6 +84,8 @@ export default function StudyCapturePage() {
   const didInitializePageRef = useRef(false);
   const chunksRef = useRef<TypedCaptureChunk[]>([]);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const markerQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const markerVersionRef = useRef(0);
 
   const sessionQuery = useQuery({
     queryKey: ["sessions", params.sessionId],
@@ -110,16 +112,19 @@ export default function StudyCapturePage() {
     }
     const savedChunks = parseTypedChunks(sessionQuery.data);
     chunksRef.current = savedChunks;
-    setChunks(savedChunks);
     hydratedRef.current = true;
+    const frameId = window.requestAnimationFrame(() => setChunks(savedChunks));
+    return () => window.cancelAnimationFrame(frameId);
   }, [sessionQuery.data]);
 
   useEffect(() => {
     if (!documentQuery.data || didInitializePageRef.current) {
       return;
     }
-    setCurrentPage(documentQuery.data.last_read_page || 1);
     didInitializePageRef.current = true;
+    const initialPage = documentQuery.data.last_read_page || 1;
+    const frameId = window.requestAnimationFrame(() => setCurrentPage(initialPage));
+    return () => window.cancelAnimationFrame(frameId);
   }, [documentQuery.data]);
 
   const queueChunkSave = (nextChunks: TypedCaptureChunk[]) => {
@@ -177,17 +182,22 @@ export default function StudyCapturePage() {
     queueChunkSave(nextChunks);
   };
 
-  const handleMarkPage = async () => {
+  const handleMarkPage = () => {
     if (!token || !documentId) {
       toast.error("The textbook is not ready to save a marker yet.");
       return;
     }
 
+    const pageToSave = currentPage;
     const previousMarkerPage = manualMarkerPage;
-    setManualMarkerPage(currentPage);
+    const version = markerVersionRef.current + 1;
+    markerVersionRef.current = version;
+    setManualMarkerPage(pageToSave);
     setIsMarking(true);
-    try {
-      const updatedDocument = await api.saveDocumentProgress(token, documentId, currentPage);
+    toast.success(`Page ${pageToSave} marked. Syncing in the background.`);
+
+    const saveOperation = markerQueueRef.current.then(async () => {
+      const updatedDocument = await api.saveDocumentProgress(token, documentId, pageToSave);
       queryClient.setQueryData(["documents", documentId], updatedDocument);
       queryClient.setQueryData<DocumentRead[]>(["documents"], (documents) =>
         documents?.map((document) =>
@@ -195,13 +205,15 @@ export default function StudyCapturePage() {
         ),
       );
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
-      toast.success(`Page ${currentPage} marked as your resume point.`);
-    } catch (error) {
-      setManualMarkerPage(previousMarkerPage);
-      toast.error(errorMessage(error, "Could not save this page marker."));
-    } finally {
-      setIsMarking(false);
-    }
+    });
+    markerQueueRef.current = saveOperation
+      .catch((error) => {
+        if (markerVersionRef.current === version) setManualMarkerPage(previousMarkerPage);
+        toast.error(errorMessage(error, "Could not sync this page marker."));
+      })
+      .finally(() => {
+        if (markerVersionRef.current === version) setIsMarking(false);
+      });
   };
 
   const finishMutation = useMutation({
@@ -211,6 +223,7 @@ export default function StudyCapturePage() {
       }
 
       await saveQueueRef.current;
+      await markerQueueRef.current;
       setProcessingStage("Syncing your capture...");
       await api.saveTypedCapture(token, params.sessionId, chunksRef.current);
 

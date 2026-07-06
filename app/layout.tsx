@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import {
   Libre_Caslon_Text,
   Manrope,
@@ -45,9 +46,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
       className={`${manrope.variable} ${plusJakartaSans.variable} ${libreCaslonText.variable} ${specialElite.variable} min-h-full scroll-smooth`}
     >
       <body className="min-h-screen bg-background text-foreground font-sans antialiased">
+        <Script id="reader-theme" strategy="beforeInteractive">
+          {`(function(){try{var t=localStorage.getItem("capy-reader-theme");if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.readerTheme=t;document.documentElement.style.colorScheme=t}catch(e){}})()`}
+        </Script>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

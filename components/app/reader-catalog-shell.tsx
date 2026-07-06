@@ -31,29 +31,16 @@ export function ReaderCatalogShell({
   onLogout,
 }: ReaderCatalogShellProps) {
   const router = useRouter();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    typeof document !== "undefined" && document.documentElement.dataset.readerTheme === "dark"
+      ? "dark"
+      : "light",
+  );
   const [chainPulled, setChainPulled] = useState(false);
 
   useEffect(() => {
-    let frameId: number | null = null;
-    try {
-      const saved = window.localStorage.getItem("capy-reader-theme");
-      if (saved === "dark" || saved === "light") {
-        frameId = window.requestAnimationFrame(() => setTheme(saved));
-      }
-    } catch {
-      // Local storage is optional; the light theme remains usable without it.
-    }
-    return () => {
-      if (frameId !== null) window.cancelAnimationFrame(frameId);
-    };
-  }, []);
-
-  useEffect(() => {
     document.documentElement.dataset.readerTheme = theme;
-    return () => {
-      delete document.documentElement.dataset.readerTheme;
-    };
+    document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   const toggleTheme = () => {
