@@ -9,6 +9,7 @@ import { DocumentReader } from "@/components/app/document-reader";
 import { OperationProgress } from "@/components/app/operation-progress";
 import { PageHeader } from "@/components/app/page-header";
 import { SessionStatusBadge } from "@/components/app/session-status-badge";
+import { SourceSuggestionsPanel } from "@/components/app/source-suggestions-panel";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
@@ -122,6 +123,14 @@ export default function StudyReadPage() {
         <OperationProgress
           label="Opening recall mode"
           detail="Saving your reading position and preparing the recorder."
+        />
+      ) : null}
+
+      {document ? (
+        <SourceSuggestionsPanel
+          documentId={document.id}
+          initialTopic={document.title}
+          mode="document"
         />
       ) : null}
 

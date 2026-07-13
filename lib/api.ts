@@ -10,6 +10,8 @@ import type {
   RecallHintRead,
   ReviewScheduleRead,
   RegisterInput,
+  SourceSuggestionRead,
+  SourceSuggestionRequest,
   StudySessionRead,
   TokenResponse,
   UploadDocumentInput,
@@ -471,6 +473,15 @@ export const api = {
 
   assessPracticeAttempt(token: string, sessionId: string, input: PracticeAttemptInput) {
     return request<PracticeAttemptRead>(`/reviews/${sessionId}/attempts`, {
+      method: "POST",
+      token,
+      json: input,
+      timeoutMs: LONG_REQUEST_TIMEOUT_MS,
+    });
+  },
+
+  getSourceSuggestions(token: string, input: SourceSuggestionRequest) {
+    return request<SourceSuggestionRead[]>("/sources/suggestions", {
       method: "POST",
       token,
       json: input,

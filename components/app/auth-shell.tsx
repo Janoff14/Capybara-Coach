@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 
 type AuthShellProps = {
@@ -11,48 +10,10 @@ type AuthShellProps = {
 };
 
 export function AuthShell({ title, description, mode, children }: AuthShellProps) {
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    typeof document !== "undefined" && document.documentElement.dataset.readerTheme === "dark"
-      ? "dark"
-      : "light",
-  );
-  const [chainPulled, setChainPulled] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.dataset.readerTheme = theme;
-    document.documentElement.style.colorScheme = theme;
-  }, [theme]);
-
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    setChainPulled(true);
-    window.setTimeout(() => setChainPulled(false), 520);
-    try {
-      window.localStorage.setItem("capy-reader-theme", next);
-    } catch {
-      // Persistence is optional.
-    }
-  };
-
   const isLogin = mode === "login";
 
   return (
-    <div className="reader-catalog reader-auth" data-theme={theme}>
-      <button
-        type="button"
-        className="reader-catalog-lamp reader-auth-lamp"
-        onClick={toggleTheme}
-        aria-label={theme === "dark" ? "Turn lights on" : "Turn lights off"}
-      >
-        <span className="reader-lamp-glow" />
-        <span className="reader-lamp-shade" />
-        <span className="reader-lamp-rim" />
-        <span className="reader-lamp-stem" />
-        <span className="reader-lamp-base" />
-        <span className={chainPulled ? "reader-lamp-chain is-pulled" : "reader-lamp-chain"} />
-      </button>
-
+    <div className="reader-catalog reader-auth">
       <main className="reader-auth-wrap">
         <div className="reader-auth-capy" aria-hidden="true">
           <i /><i /><span><b /><b /><em /></span>

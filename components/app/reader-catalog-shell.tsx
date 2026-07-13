@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, Search } from "lucide-react";
@@ -31,29 +30,6 @@ export function ReaderCatalogShell({
   onLogout,
 }: ReaderCatalogShellProps) {
   const router = useRouter();
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    typeof document !== "undefined" && document.documentElement.dataset.readerTheme === "dark"
-      ? "dark"
-      : "light",
-  );
-  const [chainPulled, setChainPulled] = useState(false);
-
-  useEffect(() => {
-    document.documentElement.dataset.readerTheme = theme;
-    document.documentElement.style.colorScheme = theme;
-  }, [theme]);
-
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    setChainPulled(true);
-    window.setTimeout(() => setChainPulled(false), 520);
-    try {
-      window.localStorage.setItem("capy-reader-theme", next);
-    } catch {
-      // Theme persistence is a convenience, not a requirement.
-    }
-  };
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,7 +40,7 @@ export function ReaderCatalogShell({
   };
 
   return (
-    <div className="reader-catalog" data-theme={theme}>
+    <div className="reader-catalog">
       <header className="reader-catalog-header">
         <div className="reader-catalog-header-row">
           <Link href="/dashboard" className="reader-catalog-brand">
@@ -83,22 +59,6 @@ export function ReaderCatalogShell({
               />
               <button type="submit" className="reader-catalog-search-submit">Search</button>
             </form>
-
-            <button
-              type="button"
-              className="reader-catalog-lamp"
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Lights on" : "Pull for lights-out"}
-              aria-label={theme === "dark" ? "Turn lights on" : "Turn lights off"}
-              aria-pressed={theme === "dark"}
-            >
-              <span className="reader-lamp-glow" />
-              <span className="reader-lamp-shade" />
-              <span className="reader-lamp-rim" />
-              <span className="reader-lamp-stem" />
-              <span className="reader-lamp-base" />
-              <span className={chainPulled ? "reader-lamp-chain is-pulled" : "reader-lamp-chain"} />
-            </button>
 
             <div className="reader-catalog-id">
               <p>Reader № 042</p>

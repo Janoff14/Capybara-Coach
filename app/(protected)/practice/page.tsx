@@ -66,6 +66,7 @@ export default function PracticePage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["flashcards"] });
+      await queryClient.invalidateQueries({ queryKey: ["reviews"] });
       toast.success("Flashcard deck generated.");
     },
     onError: (error) => toast.error(errorMessage(error, "Could not generate flashcards.")),

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { UploadDocumentDialog } from "@/components/app/upload-document-dialog";
 import { OperationProgress } from "@/components/app/operation-progress";
+import { SourceSuggestionsPanel } from "@/components/app/source-suggestions-panel";
 import { useAuth } from "@/components/providers/auth-provider";
 import { api, ApiError } from "@/lib/api";
 import { sessionDestination } from "@/lib/session-navigation";
@@ -82,6 +83,8 @@ export default function DocumentsPage() {
           detail="Creating the session and preparing the selected document."
         />
       ) : null}
+
+      <SourceSuggestionsPanel initialTopic={searchQuery} mode="catalog" />
 
       <section className="catalog-library-grid">
         <UploadDocumentDialog buttonLabel="New acquisition" buttonClassName="catalog-new-acquisition" />

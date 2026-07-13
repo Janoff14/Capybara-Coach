@@ -186,6 +186,29 @@ export type RecallHintRead = {
   debug_reason?: string | null;
 };
 
+export type SourceSuggestionRequest = {
+  topic?: string;
+  document_id?: string;
+  limit?: number;
+};
+
+export type SourceSuggestionRead = {
+  id: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  source_name: string | null;
+  source_type: string;
+  url: string;
+  doi: string | null;
+  abstract: string | null;
+  is_open_access: boolean;
+  open_access_url: string | null;
+  cited_by_count: number;
+  reason: string;
+  query: string;
+};
+
 export type TypedChunkCategory = "study_material" | "note_only" | "ai_direction";
 
 export type TypedCaptureChunk = {
